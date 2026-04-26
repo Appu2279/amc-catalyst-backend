@@ -1,0 +1,133 @@
+# ========================
+
+# Node Modules
+
+# ========================
+
+node_modules/
+
+# ========================
+
+# Logs
+
+# ========================
+
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# ========================
+
+# Runtime Data
+
+# ========================
+
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# ========================
+
+# Environment Variables
+
+# ========================
+
+.env
+.env.*
+!.env.example
+
+# ========================
+
+# Build / Output
+
+# ========================
+
+dist/
+build/
+
+# ========================
+
+# Sequelize
+
+# ========================
+
+# Ignore SQLite DB (if ever used)
+
+*.sqlite
+*.sqlite3
+
+# Sequelize meta
+
+sequelize-meta.json
+
+# ========================
+
+# OS Files
+
+# ========================
+
+.DS_Store
+Thumbs.db
+
+# ========================
+
+# IDE / Editor
+
+# ========================
+
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ========================
+
+# Coverage
+
+# ========================
+
+coverage/
+
+# ========================
+
+# Temp files
+
+# ========================
+
+tmp/
+temp/
+
+# ========================
+
+# Mac system files
+
+# ========================
+
+.AppleDouble
+.LSOverride
+
+# ========================
+
+# Debug
+
+# ========================
+
+*.stackdump
+
+# ========================
+
+# Optional: Lock files
+
+# ========================
+
+# Keep ONE of these depending on your package manager
+
+# package-lock.json
+
+# yarn.lock
+
+# pnpm-lock.yaml
