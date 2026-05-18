@@ -1,0 +1,1352 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AMC Catalyst — API Documentation</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      font-size: 13.5px;
+      color: #1a1a2e;
+      background: #fff;
+      line-height: 1.6;
+    }
+
+    /* ── Cover Page ── */
+    .cover {
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      background: linear-gradient(135deg, #0f3460 0%, #16213e 60%, #1a1a2e 100%);
+      color: white;
+      text-align: center;
+      page-break-after: always;
+    }
+    .cover h1 { font-size: 42px; font-weight: 800; letter-spacing: -1px; margin-bottom: 12px; }
+    .cover h2 { font-size: 20px; font-weight: 400; opacity: 0.75; margin-bottom: 40px; }
+    .cover .badge {
+      display: inline-block;
+      background: rgba(255,255,255,0.12);
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 8px;
+      padding: 6px 18px;
+      font-size: 12px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      margin: 4px;
+    }
+    .cover .meta { margin-top: 60px; font-size: 12px; opacity: 0.5; }
+
+    /* ── TOC ── */
+    .toc {
+      padding: 60px 80px;
+      page-break-after: always;
+    }
+    .toc h2 { font-size: 26px; font-weight: 700; color: #0f3460; margin-bottom: 30px; border-bottom: 2px solid #e5e9f0; padding-bottom: 12px; }
+    .toc-group { margin-bottom: 22px; }
+    .toc-group-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.2px; color: #888; margin-bottom: 8px; }
+    .toc-item { display: flex; justify-content: space-between; padding: 5px 0; border-bottom: 1px dotted #ddd; color: #0f3460; font-size: 13px; }
+    .toc-item span:first-child { font-weight: 500; }
+    .toc-item span:last-child { color: #999; font-size: 11px; }
+
+    /* ── Sections ── */
+    .section {
+      padding: 50px 80px;
+      page-break-before: always;
+    }
+    .section-header {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 32px;
+      padding-bottom: 14px;
+      border-bottom: 2px solid #e5e9f0;
+    }
+    .section-icon {
+      width: 42px; height: 42px;
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 20px;
+      flex-shrink: 0;
+    }
+    .section-header h2 { font-size: 24px; font-weight: 700; color: #0f3460; }
+    .section-header p { font-size: 13px; color: #666; margin-top: 2px; }
+
+    /* ── Endpoint Card ── */
+    .endpoint {
+      border: 1px solid #e5e9f0;
+      border-radius: 12px;
+      margin-bottom: 24px;
+      overflow: hidden;
+    }
+    .endpoint-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 14px 20px;
+      background: #f8fafc;
+      border-bottom: 1px solid #e5e9f0;
+      flex-wrap: wrap;
+    }
+    .method {
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.5px;
+      padding: 4px 10px;
+      border-radius: 5px;
+      min-width: 52px;
+      text-align: center;
+    }
+    .method.GET    { background: #dcfce7; color: #15803d; }
+    .method.POST   { background: #dbeafe; color: #1d4ed8; }
+    .method.PUT    { background: #fef9c3; color: #92400e; }
+    .method.PATCH  { background: #fef3c7; color: #b45309; }
+    .method.DELETE { background: #fee2e2; color: #dc2626; }
+
+    .path {
+      font-family: 'Consolas', 'Courier New', monospace;
+      font-size: 13.5px;
+      font-weight: 600;
+      color: #1a1a2e;
+      flex: 1;
+    }
+    .auth-badge {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      padding: 3px 8px;
+      border-radius: 4px;
+      text-transform: uppercase;
+    }
+    .auth-badge.public { background: #f1f5f9; color: #64748b; }
+    .auth-badge.user   { background: #ede9fe; color: #6d28d9; }
+    .auth-badge.admin  { background: #fce7f3; color: #be185d; }
+
+    .endpoint-body { padding: 16px 20px; }
+    .endpoint-desc { color: #444; margin-bottom: 14px; font-size: 13.5px; }
+
+    /* ── Tables ── */
+    table { width: 100%; border-collapse: collapse; margin: 10px 0 16px; font-size: 12.5px; }
+    th { background: #f1f5f9; color: #374151; font-weight: 600; text-align: left; padding: 8px 12px; border: 1px solid #e5e9f0; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; }
+    td { padding: 7px 12px; border: 1px solid #e5e9f0; vertical-align: top; }
+    td:first-child { font-family: monospace; font-size: 12px; color: #0f3460; font-weight: 600; white-space: nowrap; }
+    tr:nth-child(even) td { background: #fafbfc; }
+
+    /* ── Code blocks ── */
+    .code-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; color: #888; margin: 10px 0 4px; }
+    pre {
+      background: #1e293b;
+      color: #e2e8f0;
+      padding: 14px 16px;
+      border-radius: 8px;
+      font-family: 'Consolas', 'Courier New', monospace;
+      font-size: 11.5px;
+      line-height: 1.7;
+      overflow-x: auto;
+      margin-bottom: 12px;
+    }
+    .key   { color: #93c5fd; }
+    .str   { color: #86efac; }
+    .num   { color: #fca5a5; }
+    .bool  { color: #fcd34d; }
+    .comm  { color: #6b7280; font-style: italic; }
+
+    /* ── Callout boxes ── */
+    .note {
+      border-left: 4px solid;
+      padding: 10px 14px;
+      border-radius: 0 8px 8px 0;
+      font-size: 12.5px;
+      margin: 12px 0;
+    }
+    .note.info    { border-color: #3b82f6; background: #eff6ff; color: #1e40af; }
+    .note.warning { border-color: #f59e0b; background: #fffbeb; color: #92400e; }
+    .note.success { border-color: #10b981; background: #ecfdf5; color: #065f46; }
+    .note.danger  { border-color: #ef4444; background: #fef2f2; color: #991b1b; }
+
+    h4 { font-size: 12px; font-weight: 700; color: #374151; margin: 14px 0 6px; text-transform: uppercase; letter-spacing: 0.5px; }
+
+    /* ── Flow diagrams ── */
+    .flow {
+      display: flex;
+      align-items: center;
+      gap: 0;
+      margin: 14px 0;
+      flex-wrap: wrap;
+    }
+    .flow-step {
+      background: #0f3460;
+      color: white;
+      padding: 7px 14px;
+      border-radius: 6px;
+      font-size: 11.5px;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    .flow-arrow {
+      color: #94a3b8;
+      font-size: 18px;
+      margin: 0 6px;
+    }
+
+    /* ── Print ── */
+    @media print {
+      body { font-size: 12px; }
+      .section { padding: 40px 60px; }
+      .toc { padding: 40px 60px; }
+      pre { font-size: 10.5px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════ COVER ═══ -->
+<div class="cover">
+  <h1>AMC Catalyst</h1>
+  <h2>Backend API Documentation</h2>
+  <div>
+    <span class="badge">REST API</span>
+    <span class="badge">Node.js + Express</span>
+    <span class="badge">PostgreSQL</span>
+    <span class="badge">JWT Auth</span>
+  </div>
+  <div class="meta">
+    Base URL &nbsp;·&nbsp; <strong>https://your-domain.com/api</strong><br/>
+    Version 1.0 &nbsp;·&nbsp; May 2026
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════ TOC ═══ -->
+<div class="toc">
+  <h2>Table of Contents</h2>
+
+  <div class="toc-group">
+    <div class="toc-group-title">Introduction</div>
+    <div class="toc-item"><span>Authentication & Token Usage</span><span>Section 1</span></div>
+    <div class="toc-item"><span>Base URL & Response Format</span><span>Section 1</span></div>
+  </div>
+
+  <div class="toc-group">
+    <div class="toc-group-title">Auth</div>
+    <div class="toc-item"><span>Register / Login</span><span>Section 2</span></div>
+  </div>
+
+  <div class="toc-group">
+    <div class="toc-group-title">Content Management</div>
+    <div class="toc-item"><span>Subjects & Topics</span><span>Section 3</span></div>
+    <div class="toc-item"><span>Questions (Admin & Student)</span><span>Section 4</span></div>
+    <div class="toc-item"><span>Import Pipeline (Python → Node)</span><span>Section 5</span></div>
+  </div>
+
+  <div class="toc-group">
+    <div class="toc-group-title">Mock Tests</div>
+    <div class="toc-item"><span>Admin: Create & Manage Tests</span><span>Section 6</span></div>
+    <div class="toc-item"><span>Student: Start & Take Tests</span><span>Section 7</span></div>
+    <div class="toc-item"><span>Attempts: Answer, Submit, Result</span><span>Section 8</span></div>
+  </div>
+
+  <div class="toc-group">
+    <div class="toc-group-title">Student Features</div>
+    <div class="toc-item"><span>Bookmarks</span><span>Section 9</span></div>
+    <div class="toc-item"><span>Analytics & Performance</span><span>Section 10</span></div>
+  </div>
+
+  <div class="toc-group">
+    <div class="toc-group-title">Courses</div>
+    <div class="toc-item"><span>Course Listings & Subscriptions</span><span>Section 11</span></div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════ SECTION 1 ═══ -->
+<div class="section">
+  <div class="section-header">
+    <div class="section-icon" style="background:#eff6ff;">🔑</div>
+    <div>
+      <h2>Section 1 — Introduction</h2>
+      <p>Base URL, authentication, and response conventions</p>
+    </div>
+  </div>
+
+  <h4>Base URL</h4>
+  <pre>https://your-domain.com/api</pre>
+
+  <h4>Authentication</h4>
+  <p style="margin-bottom:10px;">Most endpoints require a JWT token in the <strong>Authorization</strong> header. Obtain the token from the login endpoint.</p>
+  <pre>Authorization: Bearer &lt;your_jwt_token&gt;</pre>
+
+  <div class="note info">
+    <strong>Two roles exist:</strong> <code>user</code> (student) and <code>admin</code>. Admin endpoints return 403 if a regular user token is used.
+  </div>
+
+  <h4>Standard Response Format</h4>
+  <div class="code-label">Success</div>
+  <pre><span class="comm">// Single object</span>
+{ <span class="key">"id"</span>: <span class="num">1</span>, <span class="key">"title"</span>: <span class="str">"..."</span>, ... }
+
+<span class="comm">// Paginated list</span>
+{
+  <span class="key">"data"</span>: [ ... ],
+  <span class="key">"pagination"</span>: {
+    <span class="key">"total"</span>: <span class="num">240</span>,
+    <span class="key">"page"</span>: <span class="num">1</span>,
+    <span class="key">"limit"</span>: <span class="num">20</span>,
+    <span class="key">"pages"</span>: <span class="num">12</span>
+  }
+}</pre>
+
+  <div class="code-label">Error</div>
+  <pre>{ <span class="key">"message"</span>: <span class="str">"Unauthorized"</span> }
+{ <span class="key">"error"</span>: <span class="str">"column ... does not exist"</span> }</pre>
+
+  <h4>Auth Badge Legend</h4>
+  <table>
+    <tr><th>Badge</th><th>Meaning</th></tr>
+    <tr><td>PUBLIC</td><td>No token required</td></tr>
+    <tr><td>USER</td><td>Any valid JWT token</td></tr>
+    <tr><td>ADMIN</td><td>JWT token with role = admin</td></tr>
+  </table>
+</div>
+
+<!-- ═══════════════════════════════════════════ SECTION 2 ═══ -->
+<div class="section">
+  <div class="section-header">
+    <div class="section-icon" style="background:#ecfdf5;">🔐</div>
+    <div>
+      <h2>Section 2 — Authentication</h2>
+      <p>Register, login, and get your JWT token</p>
+    </div>
+  </div>
+
+  <!-- Register -->
+  <div class="endpoint">
+    <div class="endpoint-header">
+      <span class="method POST">POST</span>
+      <span class="path">/auth/register</span>
+      <span class="auth-badge public">PUBLIC</span>
+    </div>
+    <div class="endpoint-body">
+      <p class="endpoint-desc">Create a new student account. Role defaults to <code>user</code>.</p>
+      <h4>Request Body</h4>
+      <table>
+        <tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr>
+        <tr><td>name</td><td>string</td><td>Yes</td><td>Full name</td></tr>
+        <tr><td>email</td><td>string</td><td>Yes</td><td>Must be unique</td></tr>
+        <tr><td>password</td><td>string</td><td>Yes</td><td>Min 6 characters recommended</td></tr>
+      </table>
+      <div class="code-label">Example Request</div>
+      <pre>POST /api/auth/register
+{
+  <span class="key">"name"</span>: <span class="str">"Appu"</span>,
+  <span class="key">"email"</span>: <span class="str">"appu@example.com"</span>,
+  <span class="key">"password"</span>: <span class="str">"secret123"</span>
+}</pre>
+      <div class="code-label">Response 201</div>
+      <pre>{ <span class="key">"token"</span>: <span class="str">"eyJhbGci..."</span>, <span class="key">"user"</span>: { <span class="key">"id"</span>: <span class="num">1</span>, <span class="key">"name"</span>: <span class="str">"Appu"</span>, <span class="key">"role"</span>: <span class="str">"user"</span> } }</pre>
+    </div>
+  </div>
+
+  <!-- Login -->
+  <div class="endpoint">
+    <div class="endpoint-header">
+      <span class="method POST">POST</span>
+      <span class="path">/auth/login</span>
+      <span class="auth-badge public">PUBLIC</span>
+    </div>
+    <div class="endpoint-body">
+      <p class="endpoint-desc">Authenticate and receive a JWT token. Save this token — it goes in every subsequent request header.</p>
+      <h4>Request Body</h4>
+      <table>
+        <tr><th>Field</th><th>Type</th><th>Required</th></tr>
+        <tr><td>email</td><td>string</td><td>Yes</td></tr>
+        <tr><td>password</td><td>string</td><td>Yes</td></tr>
+      </table>
+      <div class="code-label">Response 200</div>
+      <pre>{ <span class="key">"token"</span>: <span class="str">"eyJhbGci..."</span>, <span class="key">"user"</span>: { <span class="key">"id"</span>: <span class="num">1</span>, <span class="key">"name"</span>: <span class="str">"Appu"</span>, <span class="key">"role"</span>: <span class="str">"admin"</span> } }</pre>
+      <div class="note info">Store the token in localStorage or a cookie on the frontend and attach it to every request.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════ SECTION 3 ═══ -->
+<div class="section">
+  <div class="section-header">
+    <div class="section-icon" style="background:#fef9c3;">📚</div>
+    <div>
+      <h2>Section 3 — Subjects & Topics</h2>
+      <p>Organize questions by medical subject and topic</p>
+    </div>
+  </div>
+
+  <div class="note info">Subjects are top-level categories (e.g., Anatomy, Physiology). Topics are subcategories within a subject (e.g., ECG under Cardiology). Questions are always assigned to a subject and optionally to a topic.</div>
+
+  <div class="endpoint">
+    <div class="endpoint-header">
+      <span class="method GET">GET</span>
+      <span class="path">/subjects</span>
+      <span class="auth-badge public">PUBLIC</span>
+    </div>
+    <div class="endpoint-body">
+      <p class="endpoint-desc">List all active subjects with their topics. Use this to populate subject filter dropdowns on the frontend.</p>
+      <div class="code-label">Response</div>
+      <pre>[
+  {
+    <span class="key">"id"</span>: <span class="num">1</span>, <span class="key">"name"</span>: <span class="str">"Anatomy"</span>, <span class="key">"slug"</span>: <span class="str">"anatomy"</span>,
+    <span class="key">"topics"</span>: [
+      { <span class="key">"id"</span>: <span class="num">3</span>, <span class="key">"name"</span>: <span class="str">"Upper Limb"</span>, <span class="key">"slug"</span>: <span class="str">"upper-limb"</span> }
+    ]
+  }
+]</pre>
+    </div>
+  </div>
+
+  <div class="endpoint">
+    <div class="endpoint-header">
+      <span class="method GET">GET</span>
+      <span class="path">/subjects/:id/topics</span>
+      <span class="auth-badge public">PUBLIC</span>
+    </div>
+    <div class="endpoint-body">
+      <p class="endpoint-desc">Get all topics for a specific subject. Use when a student selects a subject and you need to populate the topic dropdown.</p>
+    </div>
+  </div>
+
+  <div class="endpoint">
+    <div class="endpoint-header">
+      <span class="method POST">POST</span>
+      <span class="path">/subjects</span>
+      <span class="auth-badge admin">ADMIN</span>
+    </div>
+    <div class="endpoint-body">
+      <p class="endpoint-desc">Create a new subject. Slug is auto-generated from the name.</p>
+      <table>
+        <tr><th>Field</th><th>Type</th><th>Required</th></tr>
+        <tr><td>name</td><td>string</td><td>Yes</td></tr>
+        <tr><td>description</td><td>string</td><td>No</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <div class="endpoint">
+    <div class="endpoint-header">
+      <span class="method POST">POST</span>
+      <span class="path">/subjects/topics/create</span>
+      <span class="auth-badge admin">ADMIN</span>
+    </div>
+    <div class="endpoint-body">
+      <p class="endpoint-desc">Create a new topic under a subject.</p>
+      <table>
+        <tr><th>Field</th><th>Type</th><th>Required</th></tr>
+        <tr><td>subject_id</td><td>integer</td><td>Yes</td></tr>
+        <tr><td>name</td><td>string</td><td>Yes</td></tr>
+        <tr><td>description</td><td>string</td><td>No</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <div class="endpoint">
+    <div class="endpoint-header">
+      <span class="method PUT">PUT</span>
+      <span class="path">/subjects/:id</span>
+      <span class="auth-badge admin">ADMIN</span>
+    </div>
+    <div class="endpoint-body">
+      <p class="endpoint-desc">Update a subject. Pass <code>is_active: false</code> to hide it from students without deleting.</p>
+    </div>
+  </div>
+
+  <div class="endpoint">
+    <div class="endpoint-header">
+      <span class="method PUT">PUT</span>
+      <span class="path">/subjects/topics/:id</span>
+      <span class="auth-badge admin">ADMIN</span>
+    </div>
+    <div class="endpoint-body">
+      <p class="endpoint-desc">Update a topic name, description, or active status.</p>
+    </div>
+  </div>
+
+  <div class="endpoint">
+    <div class="endpoint-header">
+      <span class="method DELETE">DELETE</span>
+      <span class="path">/subjects/:id</span>
+      <span class="auth-badge admin">ADMIN</span>
+    </div>
+    <div class="endpoint-body">
+      <p class="endpoint-desc">Permanently delete a subject. Prefer <code>is_active: false</code> instead — deletion may break existing questions that reference this subject.</p>
+      <div class="note warning">This is a hard delete. Set <code>is_active: false</code> to soft-disable instead.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════ SECTION 4 ═══ -->
+<div class="section">
+  <div class="section-header">
+    <div class="section-icon" style="background:#fce7f3;">❓</div>
+    <div>
+      <h2>Section 4 — Questions</h2>
+      <p>Admin CRUD and student QBank browsing (paginated)</p>
+    </div>
+  </div>
+
+  <div class="note info"><strong>Security rule:</strong> Student-facing endpoints never return <code>is_correct</code> on options. Only the Admin endpoints and the result endpoint (after test submission) reveal correct answers.</div>
+
+  <h4>Student Endpoints</h4>
+
+  <div class="endpoint">
+    <div class="endpoint-header">
+      <span class="method GET">GET</span>
+      <span class="path">/questions</span>
+      <span class="auth-badge public">PUBLIC</span>
+    </div>
+    <div class="endpoint-body">
+      <p class="endpoint-desc">Browse the question bank with filters and pagination. Returns questions without revealing correct answers. Use this for the QBank practice section.</p>
+      <h4>Query Parameters</h4>
+      <table>
+        <tr><th>Param</th><th>Type</th><th>Example</th><th>Description</th></tr>
+        <tr><td>subject_id</td><td>integer</td><td>1</td><td>Filter by subject</td></tr>
+        <tr><td>topic_id</td><td>integer</td><td>3</td><td>Filter by topic</td></tr>
+        <tr><td>difficulty</td><td>string</td><td>hard</td><td>easy / medium / hard</td></tr>
+        <tr><td>question_type</td><td>string</td><td>single_choice</td><td>single_choice / multiple_choice / true_false / image_based</td></tr>
+        <tr><td>source_type</td><td>string</td><td>previous_year</td><td>qbank / recall / mock / previous_year</td></tr>
+        <tr><td>search</td><td>string</td><td>ECG</td><td>Full-text search in question text</td></tr>
+        <tr><td>page</td><td>integer</td><td>1</td><td>Page number (default: 1)</td></tr>
+        <tr><td>limit</td><td>integer</td><td>20</td><td>Items per page (max: 100, default: 20)</td></tr>
+      </table>
+      <div class="code-label">Example</div>
+      <pre>GET /api/questions?subject_id=1&difficulty=hard&page=2&limit=10</pre>
+      <div class="code-label">Response</div>
+      <pre>{
+  <span class="key">"data"</span>: [
+    {
+      <span class="key">"id"</span>: <span class="num">42</span>,
+      <span class="key">"question_text"</span>: <span class="str">"A 45-year-old presents with chest pain..."</span>,
+      <span class="key">"difficulty"</span>: <span class="str">"hard"</span>,
+      <span class="key">"subject"</span>: { <span class="key">"id"</span>: <span class="num">1</span>, <span class="key">"name"</span>: <span class="str">"Cardiology"</span> },
+      <span class="key">"QuestionOptions"</span>: [
+        { <span class="key">"id"</span>: <span class="num">1</span>, <span class="key">"option_key"</span>: <span class="str">"A"</span>, <span class="key">"option_text"</span>: <span class="str">"Myocardial Infarction"</span> }
+        <span class="comm">// no is_correct field</span>
+      ]
+    }
+  ],
+  <span class="key">"pagination"</span>: { <span class="key">"total"</span>: <span class="num">86</span>, <span class="key">"page"</span>: <span class="num">2</span>, <span class="key">"limit"</span>: <span class="num">10</span>, <span class="key">"pages"</span>: <span class="num">9</span> }
+}</pre>
+    </div>
+  </div>
+
+  <div class="endpoint">
+    <div class="endpoint-header">
+      <span class="method GET">GET</span>
+      <span class="path">/questions/:id</span>
+      <span class="auth-badge public">PUBLIC</span>
+    </div>
+    <div class="endpoint-body">
+      <p class="endpoint-desc">Get a single question by ID with all its options (no correct answer flag). Use when a student clicks on a specific question in QBank practice mode.</p>
+    </div>
+  </div>
+
+  <h4>Admin Endpoints</h4>
+
+  <div class="endpoint">
+    <div class="endpoint-header">
+      <span class="method GET">GET</span>
+      <span class="path">/questions/admin</span>
+      <span class="auth-badge admin">ADMIN</span>
+    </div>
+    <div class="endpoint-body">
+      <p class="endpoint-desc">List all questions (active and inactive) with correct answers visible. Supports all the same filter params as the student endpoint plus <code>is_active</code>.</p>
+    </div>
+  </div>
+
+  <div class="endpoint">
+    <div class="endpoint-header">
+      <span class="method POST">POST</span>
+      <span class="path">/questions/admin</span>
+      <span class="auth-badge admin">ADMIN</span>
+    </div>
+    <div class="endpoint-body">
+      <p class="endpoint-desc">Manually create a question with its options in one request. Use this for adding individual questions without the import pipeline.</p>
+      <table>
+        <tr><th>Field</th><th>Type</th><th>Required</th><th>Notes</th></tr>
+        <tr><td>subject_id</td><td>integer</td><td>Yes</td><td>Must exist in subjects table</td></tr>
+        <tr><td>topic_id</td><td>integer</td><td>No</td><td></td></tr>
+        <tr><td>question_text</td><td>string</td><td>Yes</td><td></td></tr>
+        <tr><td>explanation</td><td>string</td><td>No</td><td>Shown after test submission</td></tr>
+        <tr><td>difficulty</td><td>string</td><td>No</td><td>easy / medium / hard</td></tr>
+        <tr><td>question_type</td><td>string</td><td>No</td><td>single_choice (default)</td></tr>
+        <tr><td>source_type</td><td>string</td><td>No</td><td>qbank / recall / mock / previous_year</td></tr>
+        <tr><td>marks</td><td>float</td><td>No</td><td>Default: 1</td></tr>
+        <tr><td>negative_marks</td><td>float</td><td>No</td><td>Default: 0</td></tr>
+        <tr><td>options</td><td>array</td><td>Yes</td><td>See format below</td></tr>
+      </table>
+      <div class="code-label">Example Request</div>
+      <pre>{
+  <span class="key">"subject_id"</span>: <span class="num">2</span>,
+  <span class="key">"question_text"</span>: <span class="str">"Which valve is most affected in rheumatic fever?"</span>,
+  <span class="key">"explanation"</span>: <span class="str">"Mitral valve is affected due to..."</span>,
+  <span class="key">"difficulty"</span>: <span class="str">"medium"</span>,
+  <span class="key">"marks"</span>: <span class="num">1</span>,
+  <span class="key">"negative_marks"</span>: <span class="num">0.25</span>,
+  <span class="key">"options"</span>: [
+    { <span class="key">"option_key"</span>: <span class="str">"A"</span>, <span class="key">"option_text"</span>: <span class="str">"Aortic"</span>,  <span class="key">"is_correct"</span>: <span class="bool">false</span> },
+    { <span class="key">"option_key"</span>: <span class="str">"B"</span>, <span class="key">"option_text"</span>: <span class="str">"Mitral"</span>,  <span class="key">"is_correct"</span>: <span class="bool">true</span>  },
+    { <span class="key">"option_key"</span>: <span class="str">"C"</span>, <span class="key">"option_text"</span>: <span class="str">"Tricuspid"</span>, <span class="key">"is_correct"</span>: <span class="bool">false</span> },
+    { <span class="key">"option_key"</span>: <span class="str">"D"</span>, <span class="key">"option_text"</span>: <span class="str">"Pulmonary"</span>, <span class="key">"is_correct"</span>: <span class="bool">false</span> }
+  ]
+}</pre>
+    </div>
+  </div>
+
+  <div class="endpoint">
+    <div class="endpoint-header">
+      <span class="method PUT">PUT</span>
+      <span class="path">/questions/admin/:id</span>
+      <span class="auth-badge admin">ADMIN</span>
+    </div>
+    <div class="endpoint-body">
+      <p class="endpoint-desc">Update a question's text, metadata, or options. If <code>options</code> array is provided, existing options are deleted and replaced entirely.</p>
+    </div>
+  </div>
+
+  <div class="endpoint">
+    <div class="endpoint-header">
+      <span class="method PATCH">PATCH</span>
+      <span class="path">/questions/admin/:id/toggle</span>
+      <span class="auth-badge admin">ADMIN</span>
+    </div>
+    <div class="endpoint-body">
+      <p class="endpoint-desc">Toggle <code>is_active</code> on a question. Inactive questions are invisible to students and excluded from dynamic mock test generation. Use this instead of deleting broken or disputed questions.</p>
+      <div class="code-label">Response</div>
+      <pre>{ <span class="key">"id"</span>: <span class="num">42</span>, <span class="key">"is_active"</span>: <span class="bool">false</span> }</pre>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════ SECTION 5 ═══ -->
+<div class="section">
+  <div class="section-header">
+    <div class="section-icon" style="background:#ecfdf5;">📥</div>
+    <div>
+      <h2>Section 5 — Import Pipeline</h2>
+      <p>Bulk import questions from the Python PDF parser</p>
+    </div>
+  </div>
+
+  <h4>How the Pipeline Works</h4>
+  <div class="flow">
+    <div class="flow-step">Admin creates Batch</div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-step">Node notifies Python</div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-step">Python parses PDFs</div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-step">Python POSTs to /receive</div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-step">Admin Previews</div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-step">Admin Approves</div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-step">Questions saved to DB</div>
+  </div>
+
+  <div class="note success">Set the environment variable <code>PYTHON_SERVICE_URL</code> to auto-trigger Python processing after a batch is created. If not set, pass the batch_id to Python manually.</div>
+
+  <div class="endpoint">
+    <div class="endpoint-header">
+      <span class="method POST">POST</span>
+      <span class="path">/admin/import-batches</span>
+      <span class="auth-badge admin">ADMIN</span>
+    </div>
+    <div class="endpoint-body">
+      <p class="endpoint-desc">Step 1: Create a batch record. If <code>PYTHON_SERVICE_URL</code> is configured, this also notifies the Python service automatically.</p>
+      <table>
+        <tr><th>Field</th><th>Type</th><th>Description</th></tr>
+        <tr><td>title</td><td>string</td><td>Batch label (e.g., "Recall 2024")</td></tr>
+        <tr><td>questions_pdf</td><td>string</td><td>Path or URL to questions PDF</td></tr>
+        <tr><td>answers_pdf</td><td>string</td><td>Path or URL to answers PDF</td></tr>
+      </table>
+      <div class="code-label">Response</div>
+      <pre>{ <span class="key">"batch_id"</span>: <span class="num">7</span>, <span class="key">"message"</span>: <span class="str">"Batch created and sent to processing"</span> }</pre>
+    </div>
+  </div>
+
+  <div class="endpoint">
+    <div class="endpoint-header">
+      <span class="method POST">POST</span>
+      <span class="path">/admin/import-batches/:id/receive</span>
+      <span class="auth-badge admin">ADMIN</span>
+    </div>
+    <div class="endpoint-body">
+      <p class="endpoint-desc">Step 2 (called by Python, not by admin UI): Python sends the parsed questions here after processing the PDFs. The parsed data is stored and the batch status becomes "completed".</p>
+      <div class="code-label">Body sent by Python</div>
+      <pre>{
+  <span class="key">"status"</span>: <span class="str">"completed"</span>,
+  <span class="key">"total_questions"</span>: <span class="num">50</span>,
+  <span class="key">"failed_questions"</span>: <span class="num">2</span>,
+  <span class="key">"questions"</span>: [
+    {
+      <span class="key">"question_text"</span>: <span class="str">"Which of the following..."</span>,
+      <span class="key">"explanation"</span>: <span class="str">"The correct answer is B because..."</span>,
+      <span class="key">"subject_id"</span>: <span class="num">1</span>,
+      <span class="key">"topic_id"</span>: <span class="num">3</span>,
+      <span class="key">"difficulty"</span>: <span class="str">"medium"</span>,
+      <span class="key">"source_type"</span>: <span class="str">"previous_year"</span>,
+      <span class="key">"source_year"</span>: <span class="num">2023</span>,
+      <span class="key">"options"</span>: [
+        { <span class="key">"option_key"</span>: <span class="str">"A"</span>, <span class="key">"option_text"</span>: <span class="str">"..."</span>, <span class="key">"is_correct"</span>: <span class="bool">false</span> },
+        { <span class="key">"option_key"</span>: <span class="str">"B"</span>, <span class="key">"option_text"</span>: <span class="str">"..."</span>, <span class="key">"is_correct"</span>: <span class="bool">true</span>  }
+      ]
+    }
+  ],
+  <span class="key">"logs"</span>: [<span class="str">"Page 3: ambiguous answer skipped"</span>]
+}</pre>
+    </div>
+  </div>
+
+  <div class="endpoint">
+    <div class="endpoint-header">
+      <span class="method GET">GET</span>
+      <span class="path">/admin/import-batches/:id</span>
+      <span class="auth-badge admin">ADMIN</span>
+    </div>
+    <div class="endpoint-body">
+      <p class="endpoint-desc">Step 3: Preview the batch. Returns the full parsed question data (from import_logs) so admin can review before approving.</p>
+    </div>
+  </div>
+
+  <div class="endpoint">
+    <div class="endpoint-header">
+      <span class="method POST">POST</span>
+      <span class="path">/admin/import-batches/:id/approve</span>
+      <span class="auth-badge admin">ADMIN</span>
+    </div>
+    <div class="endpoint-body">
+      <p class="endpoint-desc">Step 4: Approve the batch. Reads parsed questions from the batch and saves them permanently to the <code>questions</code> and <code>question_options</code> tables. Questions are tagged with the batch ID for rollback.</p>
+      <div class="code-label">Response</div>
+      <pre>{ <span class="key">"message"</span>: <span class="str">"Batch approved"</span>, <span class="key">"imported"</span>: <span class="num">48</span>, <span class="key">"failed"</span>: <span class="num">2</span> }</pre>
+    </div>
+  </div>
+
+  <div class="endpoint">
+    <div class="endpoint-header">
+      <span class="method DELETE">DELETE</span>
+      <span class="path">/admin/import-batches/:id</span>
+      <span class="auth-badge admin">ADMIN</span>
+    </div>
+    <div class="endpoint-body">
+      <p class="endpoint-desc">Rollback: Deletes the batch AND all questions that were created from it. Use this if an import had errors or wrong data.</p>
+      <div class="note danger">This permanently deletes all questions from this batch. Cannot be undone.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════ SECTION 6 ═══ -->
+<div class="section">
+  <div class="section-header">
+    <div class="section-icon" style="background:#fce7f3;">🛠️</div>
+    <div>
+      <h2>Section 6 — Admin: Mock Test Management</h2>
+      <p>Create fixed and dynamic tests, manage questions</p>
+    </div>
+  </div>
+
+  <div class="note info"><strong>Two test types:</strong> <code>fixed</code> — admin manually selects specific questions. <code>dynamic</code> — admin defines generation rules and the system picks random questions per student attempt.</div>
+
+  <div class="endpoint">
+    <div class="endpoint-header">
+      <span class="method POST">POST</span>
+      <span class="path">/admin/mock-tests</span>
+      <span class="auth-badge admin">ADMIN</span>
+    </div>
+    <div class="endpoint-body">
+      <p class="endpoint-desc">Create a new mock test. Set <code>test_type</code> to <code>fixed</code> or <code>dynamic</code>.</p>
+      <table>
+        <tr><th>Field</th><th>Type</th><th>Required</th><th>Notes</th></tr>
+        <tr><td>title</td><td>string</td><td>Yes</td><td></td></tr>
+        <tr><td>description</td><td>string</td><td>No</td><td></td></tr>
+        <tr><td>test_type</td><td>string</td><td>No</td><td>fixed (default) or dynamic</td></tr>
+        <tr><td>duration_minutes</td><td>integer</td><td>No</td><td>Default: 60</td></tr>
+        <tr><td>total_marks</td><td>float</td><td>No</td><td></td></tr>
+        <tr><td>randomize_questions</td><td>boolean</td><td>No</td><td>Shuffle order for fixed tests</td></tr>
+        <tr><td>randomize_options</td><td>boolean</td><td>No</td><td>Shuffle option order</td></tr>
+        <tr><td>configuration_json</td><td>object</td><td>Dynamic only</td><td>Generation rules (see below)</td></tr>
+        <tr><td>starts_at</td><td>datetime</td><td>No</td><td>Scheduled start time</td></tr>
+        <tr><td>ends_at</td><td>datetime</td><td>No</td><td>Scheduled end time</td></tr>
+      </table>
+      <div class="code-label">Dynamic Test Example</div>
+      <pre>{
+  <span class="key">"title"</span>: <span class="str">"Grand Mock — May 2026"</span>,
+  <span class="key">"test_type"</span>: <span class="str">"dynamic"</span>,
+  <span class="key">"duration_minutes"</span>: <span class="num">180</span>,
+  <span class="key">"configuration_json"</span>: {
+    <span class="key">"subjects"</span>: [
+      { <span class="key">"subject_id"</span>: <span class="num">1</span>, <span class="key">"count"</span>: <span class="num">20</span> },
+      { <span class="key">"subject_id"</span>: <span class="num">2</span>, <span class="key">"count"</span>: <span class="num">15</span> },
+      { <span class="key">"subject_id"</span>: <span class="num">3</span>, <span class="key">"count"</span>: <span class="num">15</span> }
+    ],
+    <span class="key">"difficulty"</span>: { <span class="key">"easy"</span>: <span class="num">30</span>, <span class="key">"medium"</span>: <span class="num">50</span>, <span class="key">"hard"</span>: <span class="num">20</span> }
+  }
+}</pre>
+    </div>
+  </div>
+
+  <div class="endpoint">
+    <div class="endpoint-header">
+      <span class="method POST">POST</span>
+      <span class="path">/admin/mock-tests/:id/questions</span>
+      <span class="auth-badge admin">ADMIN</span>
+    </div>
+    <div class="endpoint-body">
+      <p class="endpoint-desc">Add questions to a <strong>fixed</strong> test. Send an array of question IDs with their display order.</p>
+      <div class="code-label">Request Body</div>
+      <pre>{
+  <span class="key">"questions"</span>: [
+    { <span class="key">"question_id"</span>: <span class="num">10</span>, <span class="key">"question_order"</span>: <span class="num">1</span> },
+    { <span class="key">"question_id"</span>: <span class="num">25</span>, <span class="key">"question_order"</span>: <span class="num">2</span> },
+    { <span class="key">"question_id"</span>: <span class="num">31</span>, <span class="key">"question_order"</span>: <span class="num">3</span> }
+  ]
+}</pre>
+    </div>
+  </div>
+
+  <div class="endpoint">
+    <div class="endpoint-header">
+      <span class="method PATCH">PATCH</span>
+      <span class="path">/admin/mock-tests/:id/publish</span>
+      <span class="auth-badge admin">ADMIN</span>
+    </div>
+    <div class="endpoint-body">
+      <p class="endpoint-desc">Toggle the published status of a test. Only published tests are visible to students. Use this to prepare a test privately before releasing it.</p>
+      <div class="code-label">Response</div>
+      <pre>{ <span class="key">"is_published"</span>: <span class="bool">true</span> }</pre>
+    </div>
+  </div>
+
+  <div class="endpoint">
+    <div class="endpoint-header">
+      <span class="method DELETE">DELETE</span>
+      <span class="path">/admin/mock-tests/:id/questions/:questionId</span>
+      <span class="auth-badge admin">ADMIN</span>
+    </div>
+    <div class="endpoint-body">
+      <p class="endpoint-desc">Remove a specific question from a fixed mock test.</p>
+    </div>
+  </div>
+
+  <div class="endpoint">
+    <div class="endpoint-header">
+      <span class="method PUT">PUT</span>
+      <span class="path">/admin/mock-tests/:id</span>
+      <span class="auth-badge admin">ADMIN</span>
+    </div>
+    <div class="endpoint-body">
+      <p class="endpoint-desc">Update test metadata (title, duration, configuration, etc.). Cannot change test_type after creation.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════ SECTION 7 ═══ -->
+<div class="section">
+  <div class="section-header">
+    <div class="section-icon" style="background:#dbeafe;">📝</div>
+    <div>
+      <h2>Section 7 — Student: Browsing & Starting Tests</h2>
+      <p>Discover published tests and start an attempt</p>
+    </div>
+  </div>
+
+  <div class="endpoint">
+    <div class="endpoint-header">
+      <span class="method GET">GET</span>
+      <span class="path">/mock-tests</span>
+      <span class="auth-badge public">PUBLIC</span>
+    </div>
+    <div class="endpoint-body">
+      <p class="endpoint-desc">List all published tests. Use on the exam listing page. Returns basic info (no questions, no configuration details).</p>
+      <div class="code-label">Response</div>
+      <pre>[
+  {
+    <span class="key">"id"</span>: <span class="num">3</span>, <span class="key">"title"</span>: <span class="str">"Grand Mock — May 2026"</span>,
+    <span class="key">"test_type"</span>: <span class="str">"dynamic"</span>,
+    <span class="key">"duration_minutes"</span>: <span class="num">180</span>,
+    <span class="key">"total_questions"</span>: <span class="num">50</span>
+  }
+]</pre>
+    </div>
+  </div>
+
+  <div class="endpoint">
+    <div class="endpoint-header">
+      <span class="method GET">GET</span>
+      <span class="path">/mock-tests/:id</span>
+      <span class="auth-badge public">PUBLIC</span>
+    </div>
+    <div class="endpoint-body">
+      <p class="endpoint-desc">Get the details of a specific published test. Use on the test info/preview page before the student starts.</p>
+    </div>
+  </div>
+
+  <div class="endpoint">
+    <div class="endpoint-header">
+      <span class="method POST">POST</span>
+      <span class="path">/mock-tests/:id/start</span>
+      <span class="auth-badge user">USER</span>
+    </div>
+    <div class="endpoint-body">
+      <p class="endpoint-desc">Start a test attempt. This is a critical endpoint — it creates the attempt and generates the question snapshot.</p>
+      <ul style="color:#444; margin: 8px 0 12px 18px; font-size:13px; line-height:1.9;">
+        <li>For <strong>fixed</strong> tests: loads the admin-curated question list (optionally shuffled)</li>
+        <li>For <strong>dynamic</strong> tests: randomly selects questions per the configuration rules</li>
+        <li>Saves the exact question set to <code>attempt_questions</code> — it never changes after this point</li>
+        <li>Returns 400 if the student already has an in-progress attempt for this test</li>
+      </ul>
+      <div class="code-label">Response</div>
+      <pre>{ <span class="key">"attempt_id"</span>: <span class="num">55</span>, <span class="key">"total_questions"</span>: <span class="num">50</span> }</pre>
+      <div class="note success">Save the <code>attempt_id</code> — it's needed for all subsequent attempt endpoints.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════ SECTION 8 ═══ -->
+<div class="section">
+  <div class="section-header">
+    <div class="section-icon" style="background:#fef3c7;">⏱️</div>
+    <div>
+      <h2>Section 8 — Attempts: Answer, Submit & Results</h2>
+      <p>The full lifecycle of a student taking a test</p>
+    </div>
+  </div>
+
+  <h4>Attempt Lifecycle</h4>
+  <div class="flow">
+    <div class="flow-step">POST /start → attempt_id</div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-step">GET /attempts/:id (load questions)</div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-step">POST /answer (for each answer)</div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-step">POST /submit (finalize)</div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-step">GET /result</div>
+  </div>
+
+  <div class="endpoint">
+    <div class="endpoint-header">
+      <span class="method GET">GET</span>
+      <span class="path">/attempts/:id</span>
+      <span class="auth-badge user">USER</span>
+    </div>
+    <div class="endpoint-body">
+      <p class="endpoint-desc">Load the attempt with all its questions and the student's current answers. While the attempt is <code>in_progress</code>, the <code>is_correct</code> field is stripped from all options. Call this when the student opens or resumes a test.</p>
+      <div class="code-label">Response (in_progress)</div>
+      <pre>{
+  <span class="key">"id"</span>: <span class="num">55</span>, <span class="key">"status"</span>: <span class="str">"in_progress"</span>,
+  <span class="key">"attempt_questions"</span>: [
+    {
+      <span class="key">"question_order"</span>: <span class="num">1</span>,
+      <span class="key">"question"</span>: {
+        <span class="key">"id"</span>: <span class="num">42</span>, <span class="key">"question_text"</span>: <span class="str">"..."</span>,
+        <span class="key">"QuestionOptions"</span>: [
+          { <span class="key">"id"</span>: <span class="num">101</span>, <span class="key">"option_key"</span>: <span class="str">"A"</span>, <span class="key">"option_text"</span>: <span class="str">"..."</span> }
+          <span class="comm">// is_correct is hidden</span>
+        ]
+      }
+    }
+  ],
+  <span class="key">"answers"</span>: [
+    { <span class="key">"question_id"</span>: <span class="num">42</span>, <span class="key">"selected_option_id"</span>: <span class="num">101</span> }
+  ]
+}</pre>
+    </div>
+  </div>
+
+  <div class="endpoint">
+    <div class="endpoint-header">
+      <span class="method POST">POST</span>
+      <span class="path">/attempts/:id/answer</span>
+      <span class="auth-badge user">USER</span>
+    </div>
+    <div class="endpoint-body">
+      <p class="endpoint-desc">Save or update an answer for a single question. Call this each time the student selects or changes an option. The answer can be changed any number of times before submission. Does not evaluate correctness — that happens on submit.</p>
+      <table>
+        <tr><th>Field</th><th>Type</th><th>Required</th></tr>
+        <tr><td>question_id</td><td>integer</td><td>Yes</td></tr>
+        <tr><td>selected_option_id</td><td>integer</td><td>Yes</td></tr>
+      </table>
+      <div class="code-label">Response</div>
+      <pre>{ <span class="key">"message"</span>: <span class="str">"Answer saved"</span> }  <span class="comm">// or "Answer updated"</span></pre>
+    </div>
+  </div>
+
+  <div class="endpoint">
+    <div class="endpoint-header">
+      <span class="method POST">POST</span>
+      <span class="path">/attempts/:id/submit</span>
+      <span class="auth-badge user">USER</span>
+    </div>
+    <div class="endpoint-body">
+      <p class="endpoint-desc">Finalize and score the attempt. The backend evaluates every answer, calculates the score, and marks the attempt as completed. Only works if status is <code>in_progress</code>.</p>
+      <ul style="color:#444; margin: 8px 0 12px 18px; font-size:13px; line-height:1.9;">
+        <li>Checks each selected option against <code>is_correct</code> in the database</li>
+        <li>Applies positive marks for correct, negative marks for wrong answers</li>
+        <li>Unanswered questions get 0 marks</li>
+        <li>Updates all <code>user_answers</code> with <code>is_correct</code></li>
+        <li>Records time taken</li>
+      </ul>
+      <div class="code-label">Response</div>
+      <pre>{
+  <span class="key">"message"</span>: <span class="str">"Test submitted"</span>,
+  <span class="key">"score"</span>: <span class="num">37.75</span>,
+  <span class="key">"total_correct"</span>: <span class="num">40</span>,
+  <span class="key">"total_wrong"</span>: <span class="num">7</span>,
+  <span class="key">"total_unanswered"</span>: <span class="num">3</span>
+}</pre>
+    </div>
+  </div>
+
+  <div class="endpoint">
+    <div class="endpoint-header">
+      <span class="method GET">GET</span>
+      <span class="path">/attempts/:id/result</span>
+      <span class="auth-badge user">USER</span>
+    </div>
+    <div class="endpoint-body">
+      <p class="endpoint-desc">Get the full result of a completed attempt. Returns all questions WITH correct answers, explanations, and what the student selected. Use this for the result/review page.</p>
+      <div class="code-label">Response</div>
+      <pre>{
+  <span class="key">"score"</span>: <span class="num">37.75</span>, <span class="key">"total_correct"</span>: <span class="num">40</span>,
+  <span class="key">"attempt_questions"</span>: [
+    {
+      <span class="key">"question"</span>: {
+        <span class="key">"question_text"</span>: <span class="str">"..."</span>,
+        <span class="key">"explanation"</span>: <span class="str">"The correct answer is B because..."</span>,
+        <span class="key">"QuestionOptions"</span>: [
+          { <span class="key">"option_key"</span>: <span class="str">"A"</span>, <span class="key">"option_text"</span>: <span class="str">"..."</span>, <span class="key">"is_correct"</span>: <span class="bool">false</span> },
+          { <span class="key">"option_key"</span>: <span class="str">"B"</span>, <span class="key">"option_text"</span>: <span class="str">"..."</span>, <span class="key">"is_correct"</span>: <span class="bool">true</span>  }
+        ]
+      },
+      <span class="key">"user_answer"</span>: {
+        <span class="key">"selected_option_id"</span>: <span class="num">102</span>,
+        <span class="key">"is_correct"</span>: <span class="bool">false</span>,
+        <span class="key">"selected_option"</span>: { <span class="key">"option_key"</span>: <span class="str">"B"</span>, <span class="key">"option_text"</span>: <span class="str">"..."</span> }
+      }
+    }
+  ]
+}</pre>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════ SECTION 9 ═══ -->
+<div class="section">
+  <div class="section-header">
+    <div class="section-icon" style="background:#fef9c3;">🔖</div>
+    <div>
+      <h2>Section 9 — Bookmarks</h2>
+      <p>Students can save questions for later review</p>
+    </div>
+  </div>
+
+  <div class="endpoint">
+    <div class="endpoint-header">
+      <span class="method GET">GET</span>
+      <span class="path">/bookmarks</span>
+      <span class="auth-badge user">USER</span>
+    </div>
+    <div class="endpoint-body">
+      <p class="endpoint-desc">List all questions the logged-in student has bookmarked, paginated. Returns the full question with options (no correct answer) for review.</p>
+      <h4>Query Parameters</h4>
+      <table>
+        <tr><th>Param</th><th>Default</th></tr>
+        <tr><td>page</td><td>1</td></tr>
+        <tr><td>limit</td><td>20 (max 50)</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <div class="endpoint">
+    <div class="endpoint-header">
+      <span class="method POST">POST</span>
+      <span class="path">/bookmarks</span>
+      <span class="auth-badge user">USER</span>
+    </div>
+    <div class="endpoint-body">
+      <p class="endpoint-desc">Bookmark a question. Safe to call multiple times — returns 200 if already bookmarked.</p>
+      <div class="code-label">Request Body</div>
+      <pre>{ <span class="key">"question_id"</span>: <span class="num">42</span> }</pre>
+    </div>
+  </div>
+
+  <div class="endpoint">
+    <div class="endpoint-header">
+      <span class="method DELETE">DELETE</span>
+      <span class="path">/bookmarks/:questionId</span>
+      <span class="auth-badge user">USER</span>
+    </div>
+    <div class="endpoint-body">
+      <p class="endpoint-desc">Remove a bookmark. The <code>:questionId</code> is the question's ID, not the bookmark record's ID.</p>
+      <div class="code-label">Example</div>
+      <pre>DELETE /api/bookmarks/42</pre>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════ SECTION 10 ═══ -->
+<div class="section">
+  <div class="section-header">
+    <div class="section-icon" style="background:#dcfce7;">📊</div>
+    <div>
+      <h2>Section 10 — Analytics</h2>
+      <p>Student performance tracking and weak area identification</p>
+    </div>
+  </div>
+
+  <div class="note info">All analytics endpoints are user-specific — they only return data for the authenticated student. Analytics are computed from completed attempts only.</div>
+
+  <div class="endpoint">
+    <div class="endpoint-header">
+      <span class="method GET">GET</span>
+      <span class="path">/analytics/summary</span>
+      <span class="auth-badge user">USER</span>
+    </div>
+    <div class="endpoint-body">
+      <p class="endpoint-desc">Overall stats for the student's dashboard card. Total tests taken, accuracy, average score.</p>
+      <div class="code-label">Response</div>
+      <pre>{
+  <span class="key">"total_attempts"</span>: <span class="str">"12"</span>,
+  <span class="key">"total_correct"</span>: <span class="str">"380"</span>,
+  <span class="key">"total_wrong"</span>: <span class="str">"110"</span>,
+  <span class="key">"total_unanswered"</span>: <span class="str">"10"</span>,
+  <span class="key">"avg_score"</span>: <span class="str">"31.5"</span>,
+  <span class="key">"avg_accuracy"</span>: <span class="str">"77.55"</span>
+}</pre>
+    </div>
+  </div>
+
+  <div class="endpoint">
+    <div class="endpoint-header">
+      <span class="method GET">GET</span>
+      <span class="path">/analytics/subjects</span>
+      <span class="auth-badge user">USER</span>
+    </div>
+    <div class="endpoint-body">
+      <p class="endpoint-desc">Accuracy breakdown per subject. Use this to show a subject-wise performance bar chart or table. Results are ordered from weakest subject first.</p>
+      <div class="code-label">Response</div>
+      <pre>[
+  { <span class="key">"subject_name"</span>: <span class="str">"Biochemistry"</span>, <span class="key">"total_answered"</span>: <span class="str">"50"</span>, <span class="key">"total_correct"</span>: <span class="str">"30"</span>, <span class="key">"accuracy_percent"</span>: <span class="str">"60.00"</span> },
+  { <span class="key">"subject_name"</span>: <span class="str">"Anatomy"</span>,     <span class="key">"total_answered"</span>: <span class="str">"80"</span>, <span class="key">"total_correct"</span>: <span class="str">"65"</span>, <span class="key">"accuracy_percent"</span>: <span class="str">"81.25"</span> }
+]</pre>
+    </div>
+  </div>
+
+  <div class="endpoint">
+    <div class="endpoint-header">
+      <span class="method GET">GET</span>
+      <span class="path">/analytics/weak-topics</span>
+      <span class="auth-badge user">USER</span>
+    </div>
+    <div class="endpoint-body">
+      <p class="endpoint-desc">Top 10 topics where the student performs worst (minimum 5 questions attempted per topic). Use to power a "Focus on these topics" recommendation widget.</p>
+      <div class="code-label">Response</div>
+      <pre>[
+  { <span class="key">"topic_name"</span>: <span class="str">"Krebs Cycle"</span>, <span class="key">"subject_name"</span>: <span class="str">"Biochemistry"</span>, <span class="key">"total_answered"</span>: <span class="str">"12"</span>, <span class="key">"accuracy_percent"</span>: <span class="str">"41.67"</span> },
+  { <span class="key">"topic_name"</span>: <span class="str">"ECG Interpretation"</span>, <span class="key">"subject_name"</span>: <span class="str">"Cardiology"</span>, <span class="key">"total_answered"</span>: <span class="str">"18"</span>, <span class="key">"accuracy_percent"</span>: <span class="str">"50.00"</span> }
+]</pre>
+    </div>
+  </div>
+
+  <div class="endpoint">
+    <div class="endpoint-header">
+      <span class="method GET">GET</span>
+      <span class="path">/analytics/history</span>
+      <span class="auth-badge user">USER</span>
+    </div>
+    <div class="endpoint-body">
+      <p class="endpoint-desc">Full history of mock test attempts, newest first. Shows score, timing, and result for each attempt. Use for the "My Attempts" history table.</p>
+      <h4>Query Parameters</h4>
+      <table>
+        <tr><th>Param</th><th>Default</th></tr>
+        <tr><td>page</td><td>1</td></tr>
+        <tr><td>limit</td><td>10</td></tr>
+      </table>
+      <div class="code-label">Response</div>
+      <pre>{
+  <span class="key">"data"</span>: [
+    {
+      <span class="key">"id"</span>: <span class="num">55</span>, <span class="key">"status"</span>: <span class="str">"completed"</span>,
+      <span class="key">"score"</span>: <span class="num">37.75</span>, <span class="key">"total_correct"</span>: <span class="num">40</span>,
+      <span class="key">"time_taken_seconds"</span>: <span class="num">5820</span>,
+      <span class="key">"mock_test"</span>: { <span class="key">"title"</span>: <span class="str">"Grand Mock — May 2026"</span>, <span class="key">"total_questions"</span>: <span class="num">50</span> }
+    }
+  ],
+  <span class="key">"pagination"</span>: { <span class="key">"total"</span>: <span class="num">12</span>, <span class="key">"page"</span>: <span class="num">1</span>, <span class="key">"limit"</span>: <span class="num">10</span>, <span class="key">"pages"</span>: <span class="num">2</span> }
+}</pre>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════ SECTION 11 ═══ -->
+<div class="section">
+  <div class="section-header">
+    <div class="section-icon" style="background:#ede9fe;">🎓</div>
+    <div>
+      <h2>Section 11 — Courses</h2>
+      <p>Course listings, pricing, and subscriptions</p>
+    </div>
+  </div>
+
+  <div class="endpoint">
+    <div class="endpoint-header">
+      <span class="method GET">GET</span>
+      <span class="path">/courses</span>
+      <span class="auth-badge public">PUBLIC</span>
+    </div>
+    <div class="endpoint-body">
+      <p class="endpoint-desc">List all courses with pricing, features, and benefits. Used on the pricing/landing page.</p>
+    </div>
+  </div>
+
+  <div class="endpoint">
+    <div class="endpoint-header">
+      <span class="method GET">GET</span>
+      <span class="path">/courses/:id</span>
+      <span class="auth-badge public">PUBLIC</span>
+    </div>
+    <div class="endpoint-body">
+      <p class="endpoint-desc">Get a single course with full details.</p>
+    </div>
+  </div>
+
+  <div class="endpoint">
+    <div class="endpoint-header">
+      <span class="method POST">POST</span>
+      <span class="path">/courses/subscribe</span>
+      <span class="auth-badge user">USER</span>
+    </div>
+    <div class="endpoint-body">
+      <p class="endpoint-desc">Subscribe a student to a course (after payment). Creates a subscription record linking the user to the course.</p>
+      <div class="code-label">Request Body</div>
+      <pre>{ <span class="key">"course_id"</span>: <span class="num">2</span> }</pre>
+    </div>
+  </div>
+
+  <div class="endpoint">
+    <div class="endpoint-header">
+      <span class="method GET">GET</span>
+      <span class="path">/courses/my-courses</span>
+      <span class="auth-badge user">USER</span>
+    </div>
+    <div class="endpoint-body">
+      <p class="endpoint-desc">List all courses the logged-in student is subscribed to.</p>
+    </div>
+  </div>
+
+  <div class="endpoint">
+    <div class="endpoint-header">
+      <span class="method POST">POST</span>
+      <span class="path">/courses</span>
+      <span class="auth-badge admin">ADMIN</span>
+    </div>
+    <div class="endpoint-body">
+      <p class="endpoint-desc">Create a new course with pricing tiers, features, and benefits in a single request.</p>
+    </div>
+  </div>
+
+  <div class="endpoint">
+    <div class="endpoint-header">
+      <span class="method PUT">PUT</span>
+      <span class="path">/courses/:id</span>
+      <span class="auth-badge admin">ADMIN</span>
+    </div>
+    <div class="endpoint-body">
+      <p class="endpoint-desc">Update course details.</p>
+    </div>
+  </div>
+
+  <div class="endpoint">
+    <div class="endpoint-header">
+      <span class="method DELETE">DELETE</span>
+      <span class="path">/courses/:id</span>
+      <span class="auth-badge admin">ADMIN</span>
+    </div>
+    <div class="endpoint-body">
+      <p class="endpoint-desc">Delete a course.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════ QUICK REF ═══ -->
+<div class="section">
+  <div class="section-header">
+    <div class="section-icon" style="background:#f1f5f9;">📋</div>
+    <div>
+      <h2>Quick Reference — All Endpoints</h2>
+      <p>Complete list at a glance</p>
+    </div>
+  </div>
+
+  <table>
+    <tr><th>Method</th><th>Endpoint</th><th>Auth</th><th>Description</th></tr>
+    <tr><td>POST</td><td>/auth/register</td><td>Public</td><td>Register student</td></tr>
+    <tr><td>POST</td><td>/auth/login</td><td>Public</td><td>Login, get token</td></tr>
+    <tr><td>GET</td><td>/subjects</td><td>Public</td><td>List all subjects + topics</td></tr>
+    <tr><td>GET</td><td>/subjects/:id</td><td>Public</td><td>Get subject details</td></tr>
+    <tr><td>GET</td><td>/subjects/:id/topics</td><td>Public</td><td>Topics for a subject</td></tr>
+    <tr><td>POST</td><td>/subjects</td><td>Admin</td><td>Create subject</td></tr>
+    <tr><td>PUT</td><td>/subjects/:id</td><td>Admin</td><td>Update subject</td></tr>
+    <tr><td>DELETE</td><td>/subjects/:id</td><td>Admin</td><td>Delete subject</td></tr>
+    <tr><td>POST</td><td>/subjects/topics/create</td><td>Admin</td><td>Create topic</td></tr>
+    <tr><td>PUT</td><td>/subjects/topics/:id</td><td>Admin</td><td>Update topic</td></tr>
+    <tr><td>DELETE</td><td>/subjects/topics/:id</td><td>Admin</td><td>Delete topic</td></tr>
+    <tr><td>GET</td><td>/questions</td><td>Public</td><td>QBank list (paginated, filtered)</td></tr>
+    <tr><td>GET</td><td>/questions/:id</td><td>Public</td><td>Single question</td></tr>
+    <tr><td>GET</td><td>/questions/admin</td><td>Admin</td><td>Admin question list</td></tr>
+    <tr><td>GET</td><td>/questions/admin/:id</td><td>Admin</td><td>Admin single question</td></tr>
+    <tr><td>POST</td><td>/questions/admin</td><td>Admin</td><td>Create question</td></tr>
+    <tr><td>PUT</td><td>/questions/admin/:id</td><td>Admin</td><td>Update question</td></tr>
+    <tr><td>DELETE</td><td>/questions/admin/:id</td><td>Admin</td><td>Delete question</td></tr>
+    <tr><td>PATCH</td><td>/questions/admin/:id/toggle</td><td>Admin</td><td>Enable/disable question</td></tr>
+    <tr><td>GET</td><td>/admin/import-batches</td><td>Admin</td><td>List batches</td></tr>
+    <tr><td>GET</td><td>/admin/import-batches/:id</td><td>Admin</td><td>Batch preview</td></tr>
+    <tr><td>POST</td><td>/admin/import-batches</td><td>Admin</td><td>Create batch + trigger Python</td></tr>
+    <tr><td>POST</td><td>/admin/import-batches/:id/receive</td><td>Admin</td><td>Python webhook</td></tr>
+    <tr><td>POST</td><td>/admin/import-batches/:id/approve</td><td>Admin</td><td>Save questions to DB</td></tr>
+    <tr><td>DELETE</td><td>/admin/import-batches/:id</td><td>Admin</td><td>Rollback batch</td></tr>
+    <tr><td>GET</td><td>/admin/mock-tests</td><td>Admin</td><td>All mock tests</td></tr>
+    <tr><td>GET</td><td>/admin/mock-tests/:id</td><td>Admin</td><td>Mock test + questions</td></tr>
+    <tr><td>POST</td><td>/admin/mock-tests</td><td>Admin</td><td>Create test</td></tr>
+    <tr><td>PUT</td><td>/admin/mock-tests/:id</td><td>Admin</td><td>Update test</td></tr>
+    <tr><td>DELETE</td><td>/admin/mock-tests/:id</td><td>Admin</td><td>Delete test</td></tr>
+    <tr><td>PATCH</td><td>/admin/mock-tests/:id/publish</td><td>Admin</td><td>Publish/unpublish</td></tr>
+    <tr><td>POST</td><td>/admin/mock-tests/:id/questions</td><td>Admin</td><td>Add questions (fixed)</td></tr>
+    <tr><td>DELETE</td><td>/admin/mock-tests/:id/questions/:qId</td><td>Admin</td><td>Remove question</td></tr>
+    <tr><td>GET</td><td>/mock-tests</td><td>Public</td><td>Published tests list</td></tr>
+    <tr><td>GET</td><td>/mock-tests/:id</td><td>Public</td><td>Test info</td></tr>
+    <tr><td>POST</td><td>/mock-tests/:id/start</td><td>User</td><td>Start attempt + snapshot</td></tr>
+    <tr><td>GET</td><td>/attempts/:id</td><td>User</td><td>Load attempt + questions</td></tr>
+    <tr><td>POST</td><td>/attempts/:id/answer</td><td>User</td><td>Save/update answer</td></tr>
+    <tr><td>POST</td><td>/attempts/:id/submit</td><td>User</td><td>Submit and score</td></tr>
+    <tr><td>GET</td><td>/attempts/:id/result</td><td>User</td><td>Full result + explanations</td></tr>
+    <tr><td>GET</td><td>/bookmarks</td><td>User</td><td>List bookmarks</td></tr>
+    <tr><td>POST</td><td>/bookmarks</td><td>User</td><td>Add bookmark</td></tr>
+    <tr><td>DELETE</td><td>/bookmarks/:questionId</td><td>User</td><td>Remove bookmark</td></tr>
+    <tr><td>GET</td><td>/analytics/summary</td><td>User</td><td>Overall stats</td></tr>
+    <tr><td>GET</td><td>/analytics/subjects</td><td>User</td><td>Per-subject accuracy</td></tr>
+    <tr><td>GET</td><td>/analytics/weak-topics</td><td>User</td><td>Weakest topics</td></tr>
+    <tr><td>GET</td><td>/analytics/history</td><td>User</td><td>Attempt history</td></tr>
+    <tr><td>GET</td><td>/courses</td><td>Public</td><td>All courses + pricing</td></tr>
+    <tr><td>GET</td><td>/courses/:id</td><td>Public</td><td>Single course</td></tr>
+    <tr><td>POST</td><td>/courses/subscribe</td><td>User</td><td>Subscribe to course</td></tr>
+    <tr><td>GET</td><td>/courses/my-courses</td><td>User</td><td>My subscriptions</td></tr>
+    <tr><td>POST</td><td>/courses</td><td>Admin</td><td>Create course</td></tr>
+    <tr><td>PUT</td><td>/courses/:id</td><td>Admin</td><td>Update course</td></tr>
+    <tr><td>DELETE</td><td>/courses/:id</td><td>Admin</td><td>Delete course</td></tr>
+  </table>
+</div>
+
+</body>
+</html>

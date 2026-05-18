@@ -2,11 +2,31 @@ import express from 'express';
 import cors from 'cors';
 import authRoutes from './routes/auth.routes.js';
 import courseRoutes from './routes/course.routes.js';
+import subjectRoutes from './routes/subject.routes.js';
+import featureRoutes from './routes/feature.routes.js';
+import questionRoutes from './routes/question.routes.js';
+import adminMockTestRoutes from './routes/adminMockTest.routes.js';
+import mockTestRoutes from './routes/mockTest.routes.js';
+import attemptRoutes from './routes/attempt.routes.js';
+import importBatchRoutes from './routes/importBatch.routes.js';
+import bookmarkRoutes from './routes/bookmark.routes.js';
+import analyticsRoutes from './routes/analytics.routes.js';
+
 const app = express();
 
-app.use(cors());
+app.use(cors({ origin: '*' }));
 app.use(express.json());
 
 app.use('/api/auth', authRoutes);
 app.use('/api/courses', courseRoutes);
+app.use('/api/subjects', subjectRoutes);
+app.use('/api', featureRoutes);
+app.use('/api/questions', questionRoutes);
+app.use('/api/admin/mock-tests', adminMockTestRoutes);
+app.use('/api/admin/import-batches', importBatchRoutes);
+app.use('/api/mock-tests', mockTestRoutes);
+app.use('/api/attempts', attemptRoutes);
+app.use('/api/bookmarks', bookmarkRoutes);
+app.use('/api/analytics', analyticsRoutes);
+
 export default app;
