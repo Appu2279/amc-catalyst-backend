@@ -22,7 +22,7 @@ const paginate = (query) => {
 };
 
 const subjectTopicIncludes = (withCorrect) => [
-  { model: QuestionOption, attributes: withCorrect ? undefined : ['id', 'option_key', 'option_text'] },
+  { model: QuestionOption, as: 'options', attributes: withCorrect ? undefined : ['id', 'option_key', 'option_text'] },
   { model: Subject, as: 'subject', attributes: ['id', 'name'] },
   { model: Topic, as: 'topic', attributes: ['id', 'name'] },
 ];

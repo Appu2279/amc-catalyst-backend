@@ -34,7 +34,7 @@ export const receiveParsed = async (req, res) => {
 
 export const approveBatch = async (req, res) => {
   try {
-    res.json(await ImportBatchService.approveBatch(req.params.id, req.user.id));
+    res.json(await ImportBatchService.approveBatch(req.params.id));
   } catch (err) {
     res.status(err.status || 500).json({ message: err.message });
   }

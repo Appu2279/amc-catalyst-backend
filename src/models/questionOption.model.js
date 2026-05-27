@@ -36,6 +36,10 @@ const QuestionOption = sequelize.define(
       type: DataTypes.BOOLEAN,
       defaultValue: false,
     },
+
+    explanation: {
+      type: DataTypes.TEXT,
+    },
   },
   {
     tableName: 'question_options',

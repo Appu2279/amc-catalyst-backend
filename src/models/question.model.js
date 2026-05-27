@@ -68,6 +68,22 @@ const Question = sequelize.define(
       type: DataTypes.STRING,
     },
 
+    question_images: {
+      type: DataTypes.JSONB,
+    },
+
+    answer_images: {
+      type: DataTypes.JSONB,
+    },
+
+    image_type: {
+      type: DataTypes.STRING,
+    },
+
+    page_number: {
+      type: DataTypes.INTEGER,
+    },
+
     marks: {
       type: DataTypes.FLOAT,
       defaultValue: 1,

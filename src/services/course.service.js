@@ -40,7 +40,7 @@ export const createCourse = async ({ title, description, duration_months, is_act
 
     if (pricing) {
       await CoursePricing.create(
-        { course_id: course.id, actual_price: pricing.actual_price, discounted_price: pricing.discounted_price, is_early_bird: pricing.is_early_bird || false },
+        { course_id: course.id, actual_price: pricing[0].actual_price, discounted_price: pricing[0].discounted_price, is_early_bird: pricing[0].is_early_bird || false },
         { transaction: t }
       );
     }
@@ -75,7 +75,7 @@ export const updateCourse = async (id, { title, description, duration_months, is
       await CoursePricing.destroy({ where: { course_id: id }, transaction: t });
       if (pricing) {
         await CoursePricing.create(
-          { course_id: id, actual_price: pricing.actual_price, discounted_price: pricing.discounted_price, is_early_bird: pricing.is_early_bird || false },
+          { course_id: id, actual_price: pricing[0].actual_price, discounted_price: pricing[0].discounted_price, is_early_bird: pricing[0].is_early_bird || false },
           { transaction: t }
         );
       }
