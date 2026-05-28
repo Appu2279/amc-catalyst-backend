@@ -1,4 +1,5 @@
 import { sequelize, ImportBatch, Question, QuestionOption, Subject, Topic } from '../models/index.js';
+import { Op } from 'sequelize';
 import { AppError } from '../utils/AppError.js';
 
 const DIFFICULTY_MAP = {
@@ -68,7 +69,19 @@ export const listBatches = () =>
 export const getBatch = async (id) => {
   const batch = await ImportBatch.findByPk(id);
   if (!batch) throw new AppError('Batch not found', 404);
-  return batch;
+
+  // Include the imported questions with options + subject for the preview panel
+  const questions = await Question.findAll({
+    where: { import_batch_id: id },
+    include: [
+      { model: QuestionOption, as: 'options' },
+      { model: Subject, as: 'subject', attributes: ['id', 'name'] },
+      { model: Topic,   as: 'topic',   attributes: ['id', 'name'] },
+    ],
+    order: [['question_number', 'ASC'], ['id', 'ASC']],
+  });
+
+  return { ...batch.toJSON(), questions };
 };
 
 export const createBatch = async ({ title, questions_pdf, answers_pdf }) => {
@@ -109,9 +122,7 @@ export const receiveParsed = async (id, { status, total_questions, failed_questi
   for (const q of questions) {
     const t = await sequelize.transaction();
     try {
-      const subjectId = await findOrCreateSubject(q, t);
-      if (!subjectId) throw new Error(`Subject not provided: "${q.subject ?? q.subject_id}"`);
-
+      const subjectId = await findOrCreateSubject(q, t); // may be null — admin can assign later
       const topicId = await findOrCreateTopic(q, subjectId, t);
 
       const imagesList = Array.isArray(q.images) ? q.images.filter(Boolean) : [];
@@ -173,6 +184,8 @@ export const approveBatch = async (id) => {
   const batch = await ImportBatch.findByPk(id);
   if (!batch) throw new AppError('Batch not found', 404);
   if (batch.status !== 'completed') throw new AppError(`Batch is not ready for approval (status: ${batch.status})`, 400);
+
+  await batch.update({ status: 'approved' });
 
   return {
     message: 'Batch approved',

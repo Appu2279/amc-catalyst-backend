@@ -1,5 +1,14 @@
 import * as QuestionService from '../services/question.service.js';
 
+export const checkAnswer = async (req, res) => {
+  try {
+    const data = await QuestionService.checkAnswer(req.params.id, req.body.selected_option_id);
+    res.json({ data });
+  } catch (err) {
+    res.status(err.status || 500).json({ message: err.message });
+  }
+};
+
 export const adminListQuestions = async (req, res) => {
   try {
     res.json(await QuestionService.adminListQuestions(req.query));

@@ -15,7 +15,7 @@ const Question = sequelize.define(
 
     subject_id: {
       type: DataTypes.INTEGER,
-      allowNull: false,
+      allowNull: true,
     },
 
     topic_id: {

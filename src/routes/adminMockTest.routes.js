@@ -10,12 +10,14 @@ import {
   togglePublish,
   addQuestions,
   removeQuestion,
+  getQuestionPool,
 } from '../controllers/mockTest.controller.js';
 
 const router = Router();
 
 router.use(verifyToken, isAdmin);
 
+router.get('/question-pool', getQuestionPool); // must be before /:id
 router.post('/', createMockTest);
 router.get('/', listMockTests);
 router.get('/:id', getMockTest);

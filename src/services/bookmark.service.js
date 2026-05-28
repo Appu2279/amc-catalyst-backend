@@ -2,7 +2,7 @@ import { BookmarkedQuestion, Question, QuestionOption, Subject, Topic } from '..
 import { AppError } from '../utils/AppError.js';
 
 const questionIncludes = [
-  { model: QuestionOption, attributes: ['id', 'option_key', 'option_text'] },
+  { model: QuestionOption, as: 'options', attributes: ['id', 'option_key', 'option_text'] },
   { model: Subject, as: 'subject', attributes: ['id', 'name'] },
   { model: Topic, as: 'topic', attributes: ['id', 'name'] },
 ];

@@ -1,4 +1,5 @@
-import { MockTest, MockTestQuestion, Question, QuestionOption } from '../models/index.js';
+import { QueryTypes } from 'sequelize';
+import { sequelize, MockTest, MockTestQuestion, Question, QuestionOption } from '../models/index.js';
 import { AppError } from '../utils/AppError.js';
 
 export const createMockTest = async (data) => {
@@ -34,7 +35,7 @@ export const getMockTest = async (id) => {
   if (test.test_type === 'fixed') {
     result.questions = await MockTestQuestion.findAll({
       where: { mock_test_id: id },
-      include: [{ model: Question, as: 'question', include: [{ model: QuestionOption }] }],
+      include: [{ model: Question, as: 'question', include: [{ model: QuestionOption, as: 'options' }] }],
       order: [['question_order', 'ASC']],
     });
   }
@@ -87,6 +88,23 @@ export const addQuestions = async (testId, questions) => {
   await test.update({ total_questions: count });
   return { message: 'Questions added', count: questions.length };
 };
+
+export const getQuestionPool = async () =>
+  sequelize.query(
+    `SELECT
+       s.id::text          AS subject_id,
+       s.name              AS subject_name,
+       COUNT(q.id)::int    AS total,
+       SUM(CASE WHEN q.difficulty = 'easy'   THEN 1 ELSE 0 END)::int AS easy,
+       SUM(CASE WHEN q.difficulty = 'medium' THEN 1 ELSE 0 END)::int AS medium,
+       SUM(CASE WHEN q.difficulty = 'hard'   THEN 1 ELSE 0 END)::int AS hard,
+       SUM(CASE WHEN q.difficulty IS NULL     THEN 1 ELSE 0 END)::int AS unset
+     FROM subjects s
+     LEFT JOIN questions q ON q.subject_id = s.id AND q.is_active = true
+     GROUP BY s.id, s.name
+     ORDER BY s.name`,
+    { type: QueryTypes.SELECT }
+  );
 
 export const removeQuestion = async (testId, questionId) => {
   const deleted = await MockTestQuestion.destroy({ where: { mock_test_id: testId, question_id: questionId } });

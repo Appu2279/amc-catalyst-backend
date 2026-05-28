@@ -45,7 +45,8 @@ const ImportBatch = sequelize.define(
       type: DataTypes.ENUM(
         'processing',
         'completed',
-        'failed'
+        'failed',
+        'approved'
       ),
       defaultValue: 'processing',
     },

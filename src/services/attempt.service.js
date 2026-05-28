@@ -1,3 +1,4 @@
+import { Op } from 'sequelize';
 import { sequelize, MockTest, MockTestQuestion, Question, QuestionOption, UserMockAttempt, AttemptQuestion, UserAnswer } from '../models/index.js';
 import { AppError } from '../utils/AppError.js';
 
@@ -42,8 +43,13 @@ export const startAttempt = async (userId, testId) => {
     }
 
     if (!questionIds.length) {
-      await t.rollback();
       throw new AppError('No questions available for this test', 400);
+    }
+
+    // Sync the stored total_questions to the actual generated count.
+    // This keeps the listing card accurate when the pool is smaller than configured.
+    if (questionIds.length !== test.total_questions) {
+      await test.update({ total_questions: questionIds.length }, { transaction: t });
     }
 
     await AttemptQuestion.bulkCreate(
@@ -63,7 +69,7 @@ export const getAttempt = async (attemptId, userId) => {
     where: { id: attemptId, user_id: userId },
     include: [{
       model: AttemptQuestion, as: 'attempt_questions',
-      include: [{ model: Question, as: 'question', include: [{ model: QuestionOption }] }],
+      include: [{ model: Question, as: 'question', include: [{ model: QuestionOption, as: 'options' }] }],
       order: [['question_order', 'ASC']],
     }],
   });
@@ -76,7 +82,7 @@ export const getAttempt = async (attemptId, userId) => {
       ...aq,
       question: {
         ...aq.question,
-        QuestionOptions: aq.question?.QuestionOptions?.map(({ is_correct: _, ...opt }) => opt),
+        options: aq.question?.options?.map(({ is_correct: _, explanation: __, ...opt }) => opt),
       },
     }));
   }
@@ -155,7 +161,7 @@ export const getResult = async (attemptId, userId) => {
     where: { id: attemptId, user_id: userId, status: 'completed' },
     include: [{
       model: AttemptQuestion, as: 'attempt_questions',
-      include: [{ model: Question, as: 'question', include: [{ model: QuestionOption }] }],
+      include: [{ model: Question, as: 'question', include: [{ model: QuestionOption, as: 'options' }] }],
       order: [['question_order', 'ASC']],
     }],
   });
@@ -182,9 +188,12 @@ async function generateDynamicQuestions(config) {
 
   for (const { subject_id, count } of subjects) {
     const baseWhere = { subject_id, is_active: true };
+    let pickedIds = [];
 
     if (difficulty) {
       const { easy, medium, hard } = computeDifficultyBreakdown(count, difficulty);
+
+      // Pick per difficulty bucket
       for (const [diff, diffCount] of Object.entries({ easy, medium, hard })) {
         if (diffCount <= 0) continue;
         const qs = await Question.findAll({
@@ -193,14 +202,31 @@ async function generateDynamicQuestions(config) {
           limit: diffCount,
           attributes: ['id'],
         });
-        allIds.push(...qs.map((q) => q.id));
+        pickedIds.push(...qs.map((q) => q.id));
+      }
+
+      // Backfill any shortfall — pick remaining from the subject ignoring difficulty
+      const shortfall = count - pickedIds.length;
+      if (shortfall > 0) {
+        const extras = await Question.findAll({
+          where: {
+            ...baseWhere,
+            ...(pickedIds.length ? { id: { [Op.notIn]: pickedIds } } : {}),
+          },
+          order: sequelize.literal('RANDOM()'),
+          limit: shortfall,
+          attributes: ['id'],
+        });
+        pickedIds.push(...extras.map((q) => q.id));
       }
     } else {
       const qs = await Question.findAll({
         where: baseWhere, order: sequelize.literal('RANDOM()'), limit: count, attributes: ['id'],
       });
-      allIds.push(...qs.map((q) => q.id));
+      pickedIds = qs.map((q) => q.id);
     }
+
+    allIds.push(...pickedIds);
   }
   return allIds;
 }

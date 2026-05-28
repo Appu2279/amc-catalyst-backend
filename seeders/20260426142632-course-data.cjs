@@ -165,11 +165,25 @@ module.exports = {
       // 6. BENEFITS
       // ========================
       for (const benefit of course.benefits) {
+        // Insert benefit (title only) — upsert by title
         await queryInterface.sequelize.query(`
-          INSERT INTO benefits (course_id, title)
-          VALUES (${courseId}, '${benefit}')
+          INSERT INTO benefits (title)
+          VALUES ('${benefit}')
           ON CONFLICT DO NOTHING;
         `);
+
+        // Link to course via junction table
+        const [[benefitRow]] = await queryInterface.sequelize.query(`
+          SELECT id FROM benefits WHERE title = '${benefit}' LIMIT 1;
+        `);
+
+        if (benefitRow) {
+          await queryInterface.sequelize.query(`
+            INSERT INTO course_benefits (course_id, benefit_id)
+            VALUES (${courseId}, ${benefitRow.id})
+            ON CONFLICT DO NOTHING;
+          `);
+        }
       }
     }
 

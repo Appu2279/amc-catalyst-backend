@@ -63,3 +63,11 @@ export const removeQuestion = async (req, res) => {
     res.status(err.status || 500).json({ message: err.message });
   }
 };
+
+export const getQuestionPool = async (req, res) => {
+  try {
+    res.json(await MockTestService.getQuestionPool());
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};

@@ -11,6 +11,7 @@ import attemptRoutes from './routes/attempt.routes.js';
 import importBatchRoutes from './routes/importBatch.routes.js';
 import bookmarkRoutes from './routes/bookmark.routes.js';
 import analyticsRoutes from './routes/analytics.routes.js';
+import imageRoutes from './routes/image.routes.js';
 
 const app = express();
 
@@ -28,5 +29,6 @@ app.use('/api/mock-tests', mockTestRoutes);
 app.use('/api/attempts', attemptRoutes);
 app.use('/api/bookmarks', bookmarkRoutes);
 app.use('/api/analytics', analyticsRoutes);
+app.use('/api/images',   imageRoutes);
 
 export default app;

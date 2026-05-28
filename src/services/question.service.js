@@ -17,12 +17,19 @@ const buildWhere = (query) => {
 
 const paginate = (query) => {
   const page = Math.max(1, parseInt(query.page) || 1);
-  const limit = Math.min(100, parseInt(query.limit) || 20);
+  const limit = Math.min(500, parseInt(query.limit) || 20);
   return { limit, offset: (page - 1) * limit, page };
 };
 
 const subjectTopicIncludes = (withCorrect) => [
-  { model: QuestionOption, as: 'options', attributes: withCorrect ? undefined : ['id', 'option_key', 'option_text'] },
+  // withCorrect=true  → admin, returns all fields
+  // withCorrect=false → student list, strips is_correct + explanation (revealed via /check)
+  {
+    model: QuestionOption, as: 'options',
+    attributes: withCorrect
+      ? undefined
+      : ['id', 'option_key', 'option_text', 'option_image'],
+  },
   { model: Subject, as: 'subject', attributes: ['id', 'name'] },
   { model: Topic, as: 'topic', attributes: ['id', 'name'] },
 ];
@@ -74,13 +81,16 @@ export const updateQuestion = async (id, data) => {
   if (!question) throw new AppError('Question not found', 404);
 
   const { subject_id, topic_id, question_text, explanation, difficulty, question_type,
-    source_type, source_year, marks, negative_marks, options } = data;
+    source_type, source_year, marks, negative_marks,
+    question_image, question_images, answer_images,
+    options } = data;
 
   const t = await sequelize.transaction();
   try {
     await question.update(
       { subject_id, topic_id, question_text, explanation, difficulty, question_type,
-        source_type, source_year, marks, negative_marks },
+        source_type, source_year, marks, negative_marks,
+        question_image, question_images, answer_images },
       { transaction: t }
     );
     if (options?.length) {
@@ -130,4 +140,39 @@ export const getQuestion = async (id) => {
   });
   if (!q) throw new AppError('Question not found', 404);
   return q;
+};
+
+// Called after the student picks an option — returns correct flag + full option details
+export const checkAnswer = async (questionId, selectedOptionId) => {
+  const q = await Question.findOne({
+    where: { id: questionId, is_active: true },
+    include: [{ model: QuestionOption, as: 'options' }],
+  });
+  if (!q) throw new AppError('Question not found', 404);
+
+  const selected = q.options.find(o => o.id === selectedOptionId);
+  if (!selected) throw new AppError('Option not found', 404);
+
+  // Normalise answer_images to an array regardless of how it was stored
+  const rawImages = q.answer_images;
+  const answerImages = Array.isArray(rawImages)
+    ? rawImages
+    : typeof rawImages === 'string' && rawImages
+      ? [rawImages]
+      : [];
+
+  return {
+    is_correct: selected.is_correct,
+    correct_option_id: q.options.find(o => o.is_correct)?.id ?? null,
+    explanation: q.explanation ?? null,
+    answer_images: answerImages,
+    options: q.options.map(o => ({
+      id:           o.id,
+      option_key:   o.option_key,
+      option_text:  o.option_text,
+      is_correct:   o.is_correct,
+      explanation:  o.explanation ?? null,
+      option_image: o.option_image ?? null,
+    })),
+  };
 };
