@@ -1,0 +1,44 @@
+# Production on EC2: API container behind Caddy, database on RDS.
+#
+#   docker compose -f docker-compose.prod.yml up -d --build
+#
+# Reads its values from a .env file sitting next to it on the server. That file
+# is never committed and never baked into the image.
+
+services:
+  api:
+    build: .
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DATABASE_URL: ${DATABASE_URL:?set DATABASE_URL in .env}
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env}
+      CORS_ORIGIN: ${CORS_ORIGIN:?set CORS_ORIGIN in .env}
+    # expose, not ports: the API is reachable only from Caddy on the internal
+    # network. Publishing 3000 to the host would expose it directly, bypassing
+    # TLS entirely.
+    expose:
+      - '3000'
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    ports:
+      - '80:80'
+      - '443:443'
+    environment:
+      API_DOMAIN: ${API_DOMAIN:?set API_DOMAIN in .env}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      # Certificates live here. If this is not a volume, every redeploy asks
+      # Let's Encrypt for new certificates and you will hit the rate limit
+      # (5 per domain per week) and be locked out of HTTPS for days.
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - api
+
+volumes:
+  caddy_data:
+  caddy_config:

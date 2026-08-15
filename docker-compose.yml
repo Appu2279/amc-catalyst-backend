@@ -1,0 +1,53 @@
+# Local development: API + Postgres in containers.
+#
+#   docker compose up --build
+#
+# Production does not use this file — see docker-compose.prod.yml, where the
+# database is RDS rather than a container.
+
+services:
+  db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME:-amc_catalyst}
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+    ports:
+      # 5433 on the host: you already run Postgres on 5432 locally, and binding
+      # both would fail.
+      - '5433:5432'
+    volumes:
+      # A named volume, so `docker compose down` keeps your data. Without this
+      # the database lives in the container layer and is destroyed with it.
+      # (`down -v` still deletes it — that flag is the dangerous one.)
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${DB_USER:-postgres} -d ${DB_NAME:-amc_catalyst}']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build: .
+    restart: unless-stopped
+    environment:
+      NODE_ENV: development
+      PORT: 3000
+      # "db" resolves to the database container on the compose network.
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: ${DB_NAME:-amc_catalyst}
+      DB_USER: ${DB_USER:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD:-postgres}
+      JWT_SECRET: ${JWT_SECRET:-dev-secret-change-me}
+    ports:
+      - '3000:3000'
+    depends_on:
+      db:
+        # Waits for Postgres to accept connections, not just for the container
+        # to exist — otherwise the API starts first and crashes on boot.
+        condition: service_healthy
+
+volumes:
+  pgdata:
