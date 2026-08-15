@@ -22,9 +22,14 @@ services:
       # are safe. `docker compose down` leaves it alone — `down -v` destroys it,
       # which is the one command to never run on this box.
       - pgdata:/var/lib/postgresql/data
-    # Deliberately no `ports:`. The database is reachable only from the other
-    # containers on this network. Publishing 5432 would put it on the public
-    # internet, where scanners find it within hours.
+    ports:
+      # Bound to the host's loopback interface, NOT to 0.0.0.0. The difference
+      # matters: "5432:5432" would listen on every interface and expose the
+      # database to the internet (Docker writes its own iptables rules and can
+      # punch straight through a host firewall). With the 127.0.0.1 prefix the
+      # only way in is from the instance itself — which means an SSH tunnel,
+      # so DBeaver works without opening 5432 in the security group.
+      - '127.0.0.1:5432:5432'
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U ${DB_USER} -d ${DB_NAME:-amc_catalyst}']
       interval: 10s

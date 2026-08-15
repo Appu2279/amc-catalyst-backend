@@ -185,6 +185,41 @@ gunzip -c /home/ubuntu/backups/amc_catalyst_YYYYMMDD-HHMMSS.sql.gz | \
   docker compose -f docker-compose.prod.yml exec -T db psql -U amc -d amc_catalyst
 ```
 
+**Connecting DBeaver (or any GUI client)**
+
+Postgres listens on the instance's loopback interface only, so the route in is
+an SSH tunnel. Nothing needs opening in the security group.
+
+In DBeaver, on the **SSH** tab of the connection:
+
+| Field | Value |
+|---|---|
+| Host | your Elastic IP |
+| Port | 22 |
+| User | `ubuntu` |
+| Authentication | Public key → your `.pem` file |
+
+Then on the **Main** tab — these are resolved *through* the tunnel, so `localhost`
+means the EC2 instance, not your Mac:
+
+| Field | Value |
+|---|---|
+| Host | `localhost` |
+| Port | `5432` |
+| Database | `amc_catalyst` |
+| User / Password | `DB_USER` / `DB_PASSWORD` from the server's `.env` |
+
+The same thing from a terminal, if you prefer:
+
+```bash
+ssh -i your-key.pem -L 5433:localhost:5432 ubuntu@YOUR_ELASTIC_IP
+# then, in another shell — 5433 avoids clashing with your local Postgres
+psql -h localhost -p 5433 -U amc -d amc_catalyst
+```
+
+Anyone who can open this tunnel already has SSH access to the box, so keep port
+22 restricted to your own IP and guard the `.pem`.
+
 **Disk usage** — check occasionally, since database, images and backups share
 one volume:
 
