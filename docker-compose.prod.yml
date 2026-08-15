@@ -1,25 +1,56 @@
-# Production on EC2: API container behind Caddy, database on RDS.
+# Production on a single EC2 instance: Postgres, the API and Caddy.
 #
 #   docker compose -f docker-compose.prod.yml up -d --build
 #
 # Reads its values from a .env file sitting next to it on the server. That file
 # is never committed and never baked into the image.
+#
+# Since the database lives here rather than on a managed service, nothing backs
+# it up for you. scripts/backup-db.sh + the cron entry in DEPLOY.md are not
+# optional extras — they are the only copy of your question bank.
 
 services:
+  db:
+    image: postgres:18
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME:-amc_catalyst}
+      POSTGRES_USER: ${DB_USER:?set DB_USER in .env}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in .env}
+    volumes:
+      # Named volume: the data outlives the container, so rebuilds and reboots
+      # are safe. `docker compose down` leaves it alone — `down -v` destroys it,
+      # which is the one command to never run on this box.
+      - pgdata:/var/lib/postgresql/data
+    # Deliberately no `ports:`. The database is reachable only from the other
+    # containers on this network. Publishing 5432 would put it on the public
+    # internet, where scanners find it within hours.
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${DB_USER} -d ${DB_NAME:-amc_catalyst}']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
   api:
     build: .
     restart: unless-stopped
     environment:
       NODE_ENV: production
       PORT: 3000
-      DATABASE_URL: ${DATABASE_URL:?set DATABASE_URL in .env}
+      # "db" is the service name above, resolved on the compose network.
+      DATABASE_URL: postgresql://${DB_USER}:${DB_PASSWORD}@db:5432/${DB_NAME:-amc_catalyst}
+      # A container Postgres has no certificate; the connection never leaves
+      # the host's private network.
+      DB_SSL: 'false'
       JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env}
       CORS_ORIGIN: ${CORS_ORIGIN:?set CORS_ORIGIN in .env}
-    # expose, not ports: the API is reachable only from Caddy on the internal
-    # network. Publishing 3000 to the host would expose it directly, bypassing
-    # TLS entirely.
     expose:
       - '3000'
+    depends_on:
+      db:
+        # Waits until Postgres accepts connections, not merely until the
+        # container exists, so the API does not crash-loop on boot.
+        condition: service_healthy
 
   caddy:
     image: caddy:2
@@ -31,14 +62,15 @@ services:
       API_DOMAIN: ${API_DOMAIN:?set API_DOMAIN in .env}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      # Certificates live here. If this is not a volume, every redeploy asks
-      # Let's Encrypt for new certificates and you will hit the rate limit
-      # (5 per domain per week) and be locked out of HTTPS for days.
+      # Certificates live here. Without a volume, every redeploy requests new
+      # ones and you hit Let's Encrypt's rate limit (5 per domain per week),
+      # losing HTTPS for days.
       - caddy_data:/data
       - caddy_config:/config
     depends_on:
       - api
 
 volumes:
+  pgdata:
   caddy_data:
   caddy_config:
