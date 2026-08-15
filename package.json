@@ -4,7 +4,9 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "start": "nodemon src/server.js",
+    "start": "node src/server.js",
+    "dev": "nodemon src/server.js",
+    "admin:reset": "node scripts/reset-admin.js",
     "db:seed": "npx sequelize-cli db:seed:all --seeders-path seeders",
     "db:seed:undo": "npx sequelize-cli db:seed:undo:all --seeders-path seeders"
   },
