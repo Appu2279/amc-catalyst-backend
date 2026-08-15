@@ -7,7 +7,7 @@
 
 services:
   db:
-    image: postgres:16
+    image: postgres:18
     restart: unless-stopped
     environment:
       POSTGRES_DB: ${DB_NAME:-amc_catalyst}
@@ -18,10 +18,12 @@ services:
       # both would fail.
       - '5433:5432'
     volumes:
-      # A named volume, so `docker compose down` keeps your data. Without this
+      # A named volume, so `docker compose down` keeps your data. Mounted at
+      # /var/lib/postgresql, not .../data — Postgres 18 images store data in a
+      # major-version subdirectory and refuse to start on the old path. Without this
       # the database lives in the container layer and is destroyed with it.
       # (`down -v` still deletes it — that flag is the dangerous one.)
-      - pgdata:/var/lib/postgresql/data
+      - pgdata:/var/lib/postgresql
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U ${DB_USER:-postgres} -d ${DB_NAME:-amc_catalyst}']
       interval: 5s

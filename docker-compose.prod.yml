@@ -21,7 +21,11 @@ services:
       # Named volume: the data outlives the container, so rebuilds and reboots
       # are safe. `docker compose down` leaves it alone — `down -v` destroys it,
       # which is the one command to never run on this box.
-      - pgdata:/var/lib/postgresql/data
+      #
+      # Mounted at /var/lib/postgresql, NOT .../data. From Postgres 18 the image
+      # keeps data in a major-version subdirectory (18/docker) so that pg_upgrade
+      # can work across versions; mounting the old path makes it refuse to start.
+      - pgdata:/var/lib/postgresql
     ports:
       # Bound to the host's loopback interface, NOT to 0.0.0.0. The difference
       # matters: "5432:5432" would listen on every interface and expose the
