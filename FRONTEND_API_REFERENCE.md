@@ -63,6 +63,7 @@ export default api;
 | `attempt status` | `in_progress` `completed` `abandoned` |
 | `import batch status` | `processing` `completed` `failed` |
 | `user role` | `user` `admin` |
+| `professional role` | `medical_student` `intern` `resident` `registrar` `fellow` `general_practitioner` `consultant` `other` |
 
 ---
 
@@ -72,21 +73,32 @@ export default api;
 ```
 POST /auth/register
 ```
-**Body:**
+**Body:** — all fields required
 ```json
 {
-  "name": "John Doe",
+  "fullName": "John Doe",
   "email": "john@example.com",
-  "password": "password123"
+  "password": "password123",
+  "professionalRole": "intern",
+  "country": "AU",
+  "graduationYear": 2021
 }
 ```
-**Response 201:**
+
+| Field | Notes |
+|---|---|
+| `professionalRole` | One of `medical_student` `intern` `resident` `registrar` `fellow` `general_practitioner` `consultant` `other`. Unrelated to the `role` (access level) field. |
+| `country` | ISO 3166-1 alpha-2 code, e.g. `AU`, `IN`, `GB`. |
+| `graduationYear` | Integer, 1950 → current year + 10 (future years allowed for expected graduation). |
+
+Option lists live in `src/constants/registration.js`, mirrored at
+`amc-catalyst-frontend/src/constants/registration.js`.
+
+**Response 200:**
 ```json
-{
-  "token": "eyJhbGci...",
-  "user": { "id": 1, "name": "John Doe", "email": "john@example.com", "role": "user" }
-}
+{ "message": "User registered successfully" }
 ```
+**Errors:** `400` invalid or missing field (message names the field) · `409` email already registered
 
 ---
 
