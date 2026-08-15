@@ -30,6 +30,9 @@ CoursePricing.belongsTo(Course);
 Course.belongsToMany(Feature, { through: CourseFeature });
 Feature.belongsToMany(Course, { through: CourseFeature });
 
+// Course ↔ Course — tiered plans ("Everything in Standard PLUS …")
+Course.belongsTo(Course, { as: 'inherits_from', foreignKey: 'inherits_from_course_id' });
+
 // Course ↔ Benefit (many-to-many — shared across courses)
 Course.belongsToMany(Benefit, { through: CourseBenefit, foreignKey: 'course_id' });
 Benefit.belongsToMany(Course, { through: CourseBenefit, foreignKey: 'benefit_id' });
