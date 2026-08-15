@@ -1,0 +1,29 @@
+# Caddy obtains and renews the TLS certificate automatically, provided
+# API_DOMAIN already resolves to this server's Elastic IP and ports 80 and 443
+# are open. No certbot, no renewal cron.
+
+{$API_DOMAIN} {
+	encode gzip
+
+	# Trims fingerprinting detail and adds the headers the API does not set itself.
+	header {
+		-Server
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+	}
+
+	# "api" is the service name on the compose network.
+	reverse_proxy api:3000 {
+		health_uri /health
+		health_interval 30s
+	}
+
+	log {
+		output file /data/access.log {
+			roll_size 10MiB
+			roll_keep 5
+		}
+	}
+}

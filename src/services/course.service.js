@@ -1,9 +1,20 @@
 import { sequelize, Course, CoursePricing, Feature, Benefit, Subscription } from '../models/index.js';
 import { AppError } from '../utils/AppError.js';
 
-const courseIncludes = [CoursePricing, Feature, Benefit];
+const courseIncludes = [
+  CoursePricing,
+  Feature,
+  Benefit,
+  // Tiered plans render as "Everything in <parent> PLUS …", so the card needs
+  // the parent's title. One level only — no recursion.
+  { model: Course, as: 'inherits_from', attributes: ['id', 'title'] },
+];
 
-export const getCourses = () => Course.findAll({ include: courseIncludes });
+export const getCourses = () =>
+  Course.findAll({
+    include: courseIncludes,
+    order: [['sort_order', 'ASC'], ['id', 'ASC']],
+  });
 
 export const getCourseById = async (id) => {
   const course = await Course.findByPk(id, { include: courseIncludes });

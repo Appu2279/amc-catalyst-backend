@@ -16,9 +16,10 @@ router.put('/admin/:id', verifyToken, isAdmin, updateQuestion);
 router.delete('/admin/:id', verifyToken, isAdmin, deleteQuestion);
 router.patch('/admin/:id/toggle', verifyToken, isAdmin, toggleQuestion);
 
-// Student routes
-router.get('/', listQuestions);                            // no is_correct / explanation
-router.get('/:id', getQuestion);
+// Student routes — signed in only. The question bank is the paid product, so it
+// is never served anonymously; responses omit is_correct and explanation.
+router.get('/', verifyToken, listQuestions);
+router.get('/:id', verifyToken, getQuestion);
 router.post('/:id/check', verifyToken, checkAnswer);       // reveals answer after student picks
 
 export default router;

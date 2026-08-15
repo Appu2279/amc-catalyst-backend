@@ -123,11 +123,16 @@ export const toggleQuestion = async (id) => {
 };
 
 // ── Student ───────────────────────────────────────
+// The explanation is the teaching content students pay for — it is revealed one
+// question at a time by /check, never in a list a scraper can page through.
+const STUDENT_QUESTION_ATTRIBUTES = { exclude: ['explanation', 'created_by', 'import_batch_id'] };
+
 export const listQuestions = async (query) => {
   const where = { ...buildWhere(query), is_active: true };
   const { limit, offset, page } = paginate(query);
   const { count, rows } = await Question.findAndCountAll({
-    where, include: subjectTopicIncludes(false), limit, offset,
+    where, attributes: STUDENT_QUESTION_ATTRIBUTES,
+    include: subjectTopicIncludes(false), limit, offset,
     order: [['id', 'ASC']], distinct: true,
   });
   return { data: rows, pagination: { total: count, page, limit, pages: Math.ceil(count / limit) } };
@@ -136,6 +141,7 @@ export const listQuestions = async (query) => {
 export const getQuestion = async (id) => {
   const q = await Question.findOne({
     where: { id, is_active: true },
+    attributes: STUDENT_QUESTION_ATTRIBUTES,
     include: subjectTopicIncludes(false),
   });
   if (!q) throw new AppError('Question not found', 404);

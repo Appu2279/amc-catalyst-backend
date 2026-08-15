@@ -1,0 +1,22 @@
+# Never bake secrets into an image — env comes from the host at runtime.
+.env
+.env.*
+!.env.example
+
+node_modules
+npm-debug.log*
+
+.git
+.gitignore
+
+*.md
+!README.md
+
+# Local database dumps
+*.sql
+*.dump
+
+.DS_Store
+.vscode
+.idea
+coverage
