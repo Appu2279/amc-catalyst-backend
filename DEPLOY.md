@@ -231,3 +231,29 @@ docker system prune -f        # removes unused images and build cache
 
 **Schema changes.** Auto-sync is off in production, so a model change does not
 alter live tables. Apply schema changes deliberately with SQL, then deploy.
+
+---
+
+## Alternative: start with an empty database
+
+Instead of restoring the dump (step 6), you can create the schema from the
+models and load only the seeded data:
+
+```bash
+docker compose -f docker-compose.prod.yml exec api npm run db:sync
+docker compose -f docker-compose.prod.yml exec \
+  -e ADMIN_EMAIL=you@amccatalyst.com \
+  -e ADMIN_PASSWORD='<from your password manager>' \
+  api npm run db:seed:run
+```
+
+`db:sync` refuses to run against a database that already has tables, so it
+cannot quietly rewrite a live schema; pass `--alter` only after taking a dump.
+`db:seed:run` calls the seeders directly rather than through sequelize-cli,
+which is a devDependency and not present in the production image.
+
+**What you get:** the 4 pricing plans and an admin account.
+
+**What you do not get:** questions, options, subjects, topics, mock tests, and
+the users who have already registered. That content is only in the dump. Take
+this route only if you intend to import questions again from scratch.
