@@ -72,6 +72,13 @@ DB_PASSWORD=            # long and random: openssl rand -base64 24
 JWT_SECRET=             # fresh, not the dev value: openssl rand -hex 32
 CORS_ORIGIN=https://yourdomain.com,https://www.yourdomain.com
 API_DOMAIN=api.yourdomain.com
+
+# Study notes are stored here as private assets. The same account the importer
+# uses for question images. Without these the API still runs, but notes cannot
+# be uploaded or opened and the server logs a warning at boot.
+CLOUDINARY_CLOUD_NAME=
+CLOUDINARY_API_KEY=
+CLOUDINARY_API_SECRET=
 ```
 
 ## 5. Start
@@ -117,6 +124,33 @@ docker compose -f docker-compose.prod.yml exec -T db \
 ```
 
 Expect **146 questions, 9 users, 4 courses**.
+
+## 6b. Updating an existing deployment
+
+```bash
+cd amc-catalyst-backend
+git pull
+docker compose -f docker-compose.prod.yml up -d --build
+```
+
+`--build` matters: the image installs Ghostscript, which compresses oversized
+note PDFs before upload.
+
+Then create anything the running database is missing. `sync()` is disabled in
+production, so new tables and columns are not created on boot:
+
+```bash
+docker compose -f docker-compose.prod.yml exec api npm run db:create-new
+```
+
+It reports what it created and what already existed, only ever adds what is
+missing, and is safe to re-run. Skipping it leaves recall progress and batch
+visibility broken, because `question_progress` and `import_batches.is_visible`
+will not exist.
+
+Deploy the API **before** the frontend. The new frontend calls endpoints that
+only exist in this release, so shipping it first gives students a broken Notes
+and Recall until the API catches up.
 
 ## 7. Backups — do this now, not later
 

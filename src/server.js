@@ -1,5 +1,6 @@
 import app from './app.js';
 import { sequelize } from './models/index.js';
+import { isCloudinaryConfigured } from './config/cloudinary.js';
 
 const PORT = process.env.PORT || 3000;
 const isProduction = process.env.NODE_ENV === 'production';
@@ -10,6 +11,15 @@ const isProduction = process.env.NODE_ENV === 'production';
 const start = async () => {
   try {
     await sequelize.authenticate();
+
+    // Surfaced at boot rather than discovered when a student opens a note and
+    // gets a 503. Not fatal: everything except notes works without it.
+    if (!isCloudinaryConfigured) {
+      console.warn(
+        'WARNING: Cloudinary is not configured — study notes cannot be uploaded or opened. ' +
+          'Set CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY and CLOUDINARY_API_SECRET.'
+      );
+    }
 
     if (isProduction) {
       console.log('DB connected (schema sync skipped in production)');

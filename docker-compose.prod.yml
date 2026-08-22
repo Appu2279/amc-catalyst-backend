@@ -53,6 +53,13 @@ services:
       DB_SSL: 'false'
       JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env}
       CORS_ORIGIN: ${CORS_ORIGIN:?set CORS_ORIGIN in .env}
+      # Study notes are stored as private Cloudinary assets. Not marked
+      # required: without them the API still runs and everything except notes
+      # works, and the server logs a warning at boot rather than refusing to
+      # start. Opening a note returns a clear 503 instead of a broken page.
+      CLOUDINARY_CLOUD_NAME: ${CLOUDINARY_CLOUD_NAME}
+      CLOUDINARY_API_KEY: ${CLOUDINARY_API_KEY}
+      CLOUDINARY_API_SECRET: ${CLOUDINARY_API_SECRET}
     expose:
       - '3000'
     depends_on:
