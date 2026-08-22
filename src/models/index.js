@@ -19,6 +19,8 @@ import UserAnswer from './userAnswer.model.js';
 import BookmarkedQuestion from './bookmarkedQuestion.model.js';
 import ImportBatch from './importBatch.model.js';
 import AttemptQuestion from './attemptQuestion.model.js';
+import Note from './note.model.js';
+import QuestionProgress from './questionProgress.model.js';
 
 // 🔗 Relationships
 
@@ -131,6 +133,16 @@ BookmarkedQuestion.belongsTo(User, { foreignKey: 'user_id' });
 BookmarkedQuestion.belongsTo(Question, { foreignKey: 'question_id', as: 'question' });
 Question.hasMany(BookmarkedQuestion, { foreignKey: 'question_id' });
 
+// NOTES — author is informational only; a deleted admin must not cascade
+// away the study notes they uploaded, so there is no FK constraint here.
+Note.belongsTo(User, { foreignKey: 'created_by', as: 'author', constraints: false });
+
+// PRACTICE PROGRESS (Recall / QBank resume position)
+User.hasMany(QuestionProgress, { foreignKey: 'user_id' });
+QuestionProgress.belongsTo(User, { foreignKey: 'user_id' });
+Question.hasMany(QuestionProgress, { foreignKey: 'question_id' });
+QuestionProgress.belongsTo(Question, { foreignKey: 'question_id', as: 'question' });
+
 // IMPORT BATCHES
 ImportBatch.hasMany(Question, { foreignKey: 'import_batch_id', as: 'questions' });
 Question.belongsTo(ImportBatch, { foreignKey: 'import_batch_id', as: 'import_batch' });
@@ -156,4 +168,6 @@ export {
   BookmarkedQuestion,
   ImportBatch,
   AttemptQuestion,
+  Note,
+  QuestionProgress,
 };

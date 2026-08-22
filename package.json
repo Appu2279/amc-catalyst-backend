@@ -10,7 +10,9 @@
     "db:sync": "node scripts/sync-schema.js",
     "db:seed:run": "node scripts/run-seeders.js",
     "db:seed": "npx sequelize-cli db:seed:all --seeders-path seeders",
-    "db:seed:undo": "npx sequelize-cli db:seed:undo:all --seeders-path seeders"
+    "db:seed:undo": "npx sequelize-cli db:seed:undo:all --seeders-path seeders",
+    "notes:upload": "node scripts/upload-notes.js",
+    "db:create-new": "node scripts/create-new-tables.js"
   },
   "keywords": [],
   "author": "",
@@ -19,10 +21,13 @@
   "dependencies": {
     "@supabase/supabase-js": "^2.104.1",
     "bcrypt": "^6.0.0",
+    "cloudinary": "^2.10.1",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
     "jsonwebtoken": "^9.0.3",
+    "multer": "^2.2.0",
+    "pdf-lib": "^1.17.1",
     "pg": "^8.20.0",
     "pg-hstore": "^2.3.4",
     "sequelize": "^6.37.8"

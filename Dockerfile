@@ -18,6 +18,15 @@ FROM node:22-slim AS runtime
 ENV NODE_ENV=production
 WORKDIR /app
 
+# Ghostscript compresses oversized note PDFs before they go to storage, which
+# caps raw files at 10 MiB. Without it the API still runs and still serves
+# notes — only uploads above that ceiling fail, with a message saying why.
+# --no-install-recommends keeps this to the engine and its fonts rather than
+# pulling in X11.
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends ghostscript \
+ && rm -rf /var/lib/apt/lists/*
+
 COPY --from=deps /app/node_modules ./node_modules
 COPY package.json ./
 COPY src ./src

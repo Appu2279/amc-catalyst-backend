@@ -1,3 +1,4 @@
+import * as QuestionService from '../services/question.service.js';
 import * as ImportBatchService from '../services/importBatch.service.js';
 
 export const listBatches = async (req, res) => {
@@ -35,6 +36,16 @@ export const receiveParsed = async (req, res) => {
 export const approveBatch = async (req, res) => {
   try {
     res.json(await ImportBatchService.approveBatch(req.params.id));
+  } catch (err) {
+    res.status(err.status || 500).json({ message: err.message });
+  }
+};
+
+// PATCH /api/admin/import-batches/:id/visibility  { is_visible: boolean }
+// Shows or hides a whole recall batch for students. Nothing is deleted.
+export const setBatchVisibility = async (req, res) => {
+  try {
+    res.json({ data: await QuestionService.setBatchVisibility(req.params.id, req.body.is_visible) });
   } catch (err) {
     res.status(err.status || 500).json({ message: err.message });
   }

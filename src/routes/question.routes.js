@@ -3,7 +3,8 @@ import { verifyToken } from '../middleware/authMiddleware.js';
 import { isAdmin } from '../middleware/roleMiddleware.js';
 import {
   adminListQuestions, adminGetQuestion, createQuestion, updateQuestion, deleteQuestion, toggleQuestion,
-  listQuestions, getQuestion, checkAnswer,
+  listQuestions, getQuestion, checkAnswer, getPracticeProgress, resetPracticeProgress,
+  listQuestionBatches,
 } from '../controllers/question.controller.js';
 
 const router = Router();
@@ -18,6 +19,11 @@ router.patch('/admin/:id/toggle', verifyToken, isAdmin, toggleQuestion);
 
 // Student routes — signed in only. The question bank is the paid product, so it
 // is never served anonymously; responses omit is_correct and explanation.
+// Declared before '/:id' so that "progress" is never read as a question id.
+router.get('/batches', verifyToken, listQuestionBatches);
+router.get('/progress', verifyToken, getPracticeProgress);
+router.delete('/progress', verifyToken, resetPracticeProgress);
+
 router.get('/', verifyToken, listQuestions);
 router.get('/:id', verifyToken, getQuestion);
 router.post('/:id/check', verifyToken, checkAnswer);       // reveals answer after student picks

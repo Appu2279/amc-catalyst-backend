@@ -54,6 +54,24 @@ const ImportBatch = sequelize.define(
     import_logs: {
       type: DataTypes.JSONB,
     },
+
+    /**
+     * Whether students can see this batch's questions.
+     *
+     * An import batch doubles as the student-facing grouping for recalls — one
+     * upload is one month's recall, and `title` is already written that way
+     * ("August Recall 2026"). Hiding a batch takes its questions out of
+     * practice everywhere without deleting anything, so it can be shown again
+     * later.
+     *
+     * Distinct from `status`, which tracks whether the import itself worked.
+     * A batch can be successfully imported (approved) and still be hidden.
+     */
+    is_visible: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: true,
+    },
   },
   {
     tableName: 'import_batches',

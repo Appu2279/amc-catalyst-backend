@@ -2,8 +2,41 @@ import * as QuestionService from '../services/question.service.js';
 
 export const checkAnswer = async (req, res) => {
   try {
-    const data = await QuestionService.checkAnswer(req.params.id, req.body.selected_option_id);
+    // req.user.id is passed so the answer is recorded against the student —
+    // that is what lets Recall resume where they stopped, on any device.
+    const data = await QuestionService.checkAnswer(
+      req.params.id,
+      req.body.selected_option_id,
+      req.user?.id
+    );
     res.json({ data });
+  } catch (err) {
+    res.status(err.status || 500).json({ message: err.message });
+  }
+};
+
+// GET /api/questions/progress?source_type=recall
+export const getPracticeProgress = async (req, res) => {
+  try {
+    res.json({ data: await QuestionService.getPracticeProgress(req.user.id, req.query) });
+  } catch (err) {
+    res.status(err.status || 500).json({ message: err.message });
+  }
+};
+
+// GET /api/questions/batches?source_type=recall
+export const listQuestionBatches = async (req, res) => {
+  try {
+    res.json({ data: await QuestionService.listQuestionBatches(req.query, req.user?.id) });
+  } catch (err) {
+    res.status(err.status || 500).json({ message: err.message });
+  }
+};
+
+// DELETE /api/questions/progress?source_type=recall — "start over"
+export const resetPracticeProgress = async (req, res) => {
+  try {
+    res.json({ data: await QuestionService.resetPracticeProgress(req.user.id, req.query) });
   } catch (err) {
     res.status(err.status || 500).json({ message: err.message });
   }
