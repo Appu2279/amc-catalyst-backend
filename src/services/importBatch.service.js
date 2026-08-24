@@ -180,6 +180,94 @@ export const receiveParsed = async (id, { status, total_questions, failed_questi
   return { message: 'Questions imported successfully', batch_id: batch.id, imported, failed, failed_details: failedDetails };
 };
 
+/**
+ * Batch membership is one column on the question (`import_batch_id`), so moving
+ * a question in or out of a batch never touches the question, its options or
+ * anyone's progress on it. Removing a question from a batch unassigns it; it
+ * stays in the question bank and can be put in another batch afterwards.
+ * Deleting a question outright stays where it belongs, on the questions page.
+ */
+
+/**
+ * `imported_questions` is what the admin table reads as the size of a batch, so
+ * it tracks membership rather than staying frozen at whatever the parser
+ * reported. `total_questions` is left alone: that is the parse result and a
+ * record of the import run.
+ */
+const syncImportedCount = async (batchId) => {
+  const imported = await Question.count({ where: { import_batch_id: batchId } });
+  await ImportBatch.update({ imported_questions: imported }, { where: { id: batchId } });
+  return imported;
+};
+
+/**
+ * The pool the "add to batch" picker draws from: questions that belong to no
+ * batch at all. A question already in a batch is deliberately not offered —
+ * moving it would silently shrink the batch it came from, so it has to be
+ * removed there first.
+ *
+ * Capped, with an optional text search, because the pool grows with every
+ * hand-written question and the picker only ever shows a screenful.
+ */
+export const listUnassignedQuestions = async ({ search } = {}) => {
+  const where = { import_batch_id: null };
+  const term = search?.trim();
+  if (term) where.question_text = { [Op.iLike]: `%${term}%` };
+
+  return Question.findAll({
+    where,
+    include: [
+      { model: QuestionOption, as: 'options' },
+      { model: Subject, as: 'subject', attributes: ['id', 'name'] },
+      { model: Topic,   as: 'topic',   attributes: ['id', 'name'] },
+    ],
+    order: [['id', 'DESC']],
+    limit: 200,
+  });
+};
+
+export const removeQuestionFromBatch = async (batchId, questionId) => {
+  const question = await Question.findByPk(questionId);
+  if (!question) throw new AppError('Question not found', 404);
+  if (String(question.import_batch_id) !== String(batchId)) {
+    throw new AppError('Question does not belong to this batch', 400);
+  }
+
+  await question.update({ import_batch_id: null });
+
+  return {
+    message: 'Question removed from batch',
+    question_id: question.id,
+    imported_questions: await syncImportedCount(batchId),
+  };
+};
+
+export const addQuestionsToBatch = async (batchId, questionIds) => {
+  const batch = await ImportBatch.findByPk(batchId);
+  if (!batch) throw new AppError('Batch not found', 404);
+
+  const ids = [...new Set((questionIds ?? []).map(Number).filter(Boolean))];
+  if (!ids.length) throw new AppError('No questions selected', 400);
+
+  // `import_batch_id: null` in the WHERE, rather than a read-then-write: a
+  // question that has been claimed by another batch in the meantime is skipped
+  // instead of quietly taken from it.
+  const [added] = await Question.update(
+    { import_batch_id: batch.id },
+    { where: { id: { [Op.in]: ids }, import_batch_id: null } }
+  );
+
+  const skipped = ids.length - added;
+  return {
+    message: skipped
+      ? `${added} of ${ids.length} added — the rest already belong to a batch`
+      : 'Questions added to batch',
+    added,
+    skipped,
+    imported_questions: await syncImportedCount(batch.id),
+  };
+};
+
 export const approveBatch = async (id) => {
   const batch = await ImportBatch.findByPk(id);
   if (!batch) throw new AppError('Batch not found', 404);

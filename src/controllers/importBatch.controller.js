@@ -51,6 +51,36 @@ export const setBatchVisibility = async (req, res) => {
   }
 };
 
+// GET /api/admin/import-batches/unassigned-questions?search=
+// The pool of questions that belong to no batch — what the picker offers.
+export const listUnassignedQuestions = async (req, res) => {
+  try {
+    res.json({ data: await ImportBatchService.listUnassignedQuestions(req.query) });
+  } catch (err) {
+    res.status(err.status || 500).json({ message: err.message });
+  }
+};
+
+// POST /api/admin/import-batches/:id/questions  { question_ids: [1, 2, 3] }
+export const addQuestionsToBatch = async (req, res) => {
+  try {
+    res.json(await ImportBatchService.addQuestionsToBatch(req.params.id, req.body.question_ids));
+  } catch (err) {
+    res.status(err.status || 500).json({ message: err.message });
+  }
+};
+
+// DELETE /api/admin/import-batches/:id/questions/:questionId
+// Unassigns the question — it stays in the question bank. Deleting a question
+// for good is the questions page's job.
+export const removeQuestionFromBatch = async (req, res) => {
+  try {
+    res.json(await ImportBatchService.removeQuestionFromBatch(req.params.id, req.params.questionId));
+  } catch (err) {
+    res.status(err.status || 500).json({ message: err.message });
+  }
+};
+
 export const rollbackBatch = async (req, res) => {
   try {
     res.json(await ImportBatchService.rollbackBatch(req.params.id));
