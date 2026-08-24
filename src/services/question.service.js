@@ -23,36 +23,61 @@ const paginate = (query) => {
 };
 
 /**
- * A where-fragment that removes questions belonging to hidden import batches.
+ * A where-fragment that limits questions to the ones students are meant to see.
  *
- * An import batch is the student-facing grouping for recalls — one upload is
- * one month ("August Recall 2026"), and hiding it must take its questions out
- * of practice everywhere: lists, single fetches, answer checks and progress.
+ * Two rules, both about import batches:
  *
- * Implemented by looking the hidden ids up first rather than joining and
- * filtering on `$import_batch.is_visible$`. The question list includes a
- * hasMany association, so Sequelize wraps the query in a limit subquery that
- * the joined table is not part of, and a where against it fails at runtime.
- * There are only ever a handful of batches, so the extra query is free.
+ * 1. A batch is the student-facing grouping for recalls — one upload is one
+ *    month ("August Recall 2026") — and hiding a batch must take its questions
+ *    out of practice everywhere: lists, single fetches, answer checks and
+ *    progress.
  *
- * Questions with no batch (created by hand in the admin) are always visible —
- * they have no batch to hide, and excluding them would make them silently
- * vanish.
+ * 2. A recall question that belongs to no batch is unfiled, not published. It
+ *    is either waiting to be moved between batches or was written by hand and
+ *    not grouped yet, and either way it has no month to appear under. Unfiled
+ *    recall questions used to be bundled into a synthetic "Other questions"
+ *    batch, which meant taking a question out of a batch quietly republished it
+ *    somewhere else instead of withdrawing it.
+ *
+ * The batch requirement is deliberately scoped to recall. Other modes are not
+ * organised by batch at all, so a hand-written qbank question having no batch
+ * is normal and excluding it would make it silently vanish.
+ *
+ * Returned under Op.and rather than as a bare `import_batch_id` key: callers
+ * spread this next to their own `import_batch_id` filter — "answered 10 of 40"
+ * for one month — and a second string key of the same name would overwrite it.
+ *
+ * Hidden ids are looked up first rather than joining and filtering on
+ * `$import_batch.is_visible$`. The question list includes a hasMany
+ * association, so Sequelize wraps the query in a limit subquery that the joined
+ * table is not part of, and a where against it fails at runtime. There are only
+ * ever a handful of batches, so the extra query is free.
  */
-const excludeHiddenBatches = async () => {
+const inVisibleBatch = async () => {
+  const clauses = [
+    {
+      [Op.or]: [
+        { source_type: { [Op.ne]: 'recall' } },
+        { import_batch_id: { [Op.ne]: null } },
+      ],
+    },
+  ];
+
   const hidden = await ImportBatch.findAll({
     where: { is_visible: false },
     attributes: ['id'],
   });
 
-  if (!hidden.length) return {};
+  if (hidden.length) {
+    clauses.push({
+      [Op.or]: [
+        { import_batch_id: null },
+        { import_batch_id: { [Op.notIn]: hidden.map((b) => b.id) } },
+      ],
+    });
+  }
 
-  return {
-    [Op.or]: [
-      { import_batch_id: null },
-      { import_batch_id: { [Op.notIn]: hidden.map((b) => b.id) } },
-    ],
-  };
+  return { [Op.and]: clauses };
 };
 
 const subjectTopicIncludes = (withCorrect) => [
@@ -162,7 +187,7 @@ export const toggleQuestion = async (id) => {
 const STUDENT_QUESTION_ATTRIBUTES = { exclude: ['explanation', 'created_by', 'import_batch_id'] };
 
 export const listQuestions = async (query) => {
-  const where = { ...buildWhere(query), is_active: true, ...(await excludeHiddenBatches()) };
+  const where = { ...buildWhere(query), is_active: true, ...(await inVisibleBatch()) };
   const { limit, offset, page } = paginate(query);
   const { count, rows } = await Question.findAndCountAll({
     where, attributes: STUDENT_QUESTION_ATTRIBUTES,
@@ -177,7 +202,7 @@ export const getQuestion = async (id) => {
     // Hidden batches are excluded here too, not just in the list: otherwise a
     // student who kept a question id could still fetch it after the batch was
     // hidden.
-    where: { id, is_active: true, ...(await excludeHiddenBatches()) },
+    where: { id, is_active: true, ...(await inVisibleBatch()) },
     attributes: STUDENT_QUESTION_ATTRIBUTES,
     include: subjectTopicIncludes(false),
   });
@@ -188,7 +213,7 @@ export const getQuestion = async (id) => {
 // Called after the student picks an option — returns correct flag + full option details
 export const checkAnswer = async (questionId, selectedOptionId, userId) => {
   const q = await Question.findOne({
-    where: { id: questionId, is_active: true, ...(await excludeHiddenBatches()) },
+    where: { id: questionId, is_active: true, ...(await inVisibleBatch()) },
     include: [{ model: QuestionOption, as: 'options' }],
   });
   if (!q) throw new AppError('Question not found', 404);
@@ -299,7 +324,7 @@ export const getPracticeProgress = async (userId, { source_type, import_batch_id
           // set the student is actually looking at rather than every recall
           // they have ever done.
           ...(import_batch_id ? { import_batch_id } : {}),
-          ...(await excludeHiddenBatches()),
+          ...(await inVisibleBatch()),
         },
       },
     ],
@@ -370,14 +395,17 @@ export const listQuestionBatches = async ({ source_type } = {}, userId) => {
     where: {
       is_active: true,
       ...(source_type ? { source_type } : {}),
-      ...(await excludeHiddenBatches()),
+      import_batch_id: { [Op.ne]: null },
+      ...(await inVisibleBatch()),
     },
     include: [
       {
         model: ImportBatch,
         as: 'import_batch',
         attributes: ['id', 'title', 'createdAt'],
-        required: false,
+        // Inner join: this endpoint answers "which batches can I practise",
+        // and a question with no batch is not an answer to that.
+        required: true,
       },
     ],
     group: ['Question.import_batch_id', 'import_batch.id'],
@@ -415,18 +443,13 @@ export const listQuestionBatches = async ({ source_type } = {}, userId) => {
   return rows
     .map((r) => ({
       id: r.import_batch_id,
-      title: r.import_batch?.title ?? 'Other questions',
+      title: r.import_batch.title,
       question_count: Number(r.question_count),
       answered_count: answeredByBatch.get(r.import_batch_id) ?? 0,
-      created_at: r.import_batch?.createdAt ?? null,
+      created_at: r.import_batch.createdAt,
     }))
-    // Newest batch first — that is the one students want by default. Unbatched
-    // questions have no date, so they sort last.
-    .sort((a, b) => {
-      if (!a.created_at) return 1;
-      if (!b.created_at) return -1;
-      return new Date(b.created_at) - new Date(a.created_at);
-    });
+    // Newest batch first — that is the one students want by default.
+    .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 };
 
 /**
