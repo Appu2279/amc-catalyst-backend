@@ -3,7 +3,7 @@
 # Shrink note PDFs to fit the 10 MiB storage limit.
 #
 #   ./scripts/compress-notes.sh ./notes/*.pdf
-#   ./scripts/compress-notes.sh --quality screen ./notes/big.pdf
+#   ./scripts/compress-notes.sh --dpi 220 ./notes/big.pdf
 #
 # Writes into a compressed/ subdirectory using the SAME filename, and never
 # modifies the original, so a bad result costs nothing. The filename is
@@ -13,19 +13,21 @@
 #
 # Reports before/after and flags anything still over the limit.
 #
-# Quality presets (Ghostscript -dPDFSETTINGS):
-#   ebook   150 dpi images — the default here, fine for reading on screen
-#   screen   72 dpi images — much smaller, visibly softer
-#   printer 300 dpi images — near-original, shrinks least
+# --dpi is the resolution images are downsampled to, and mirrors the ladder in
+# services/compress.service.js:
+#   300  the default — keeps small print inside figures and tables readable
+#   220  a middle rung for a file that will not fit at 300
+#   150  the floor; below this the text inside a figure stops being readable,
+#        so split the PDF into parts instead of going lower
 #
 # Requires Ghostscript:  brew install ghostscript
 set -uo pipefail
 
 LIMIT=$((10 * 1024 * 1024))
-QUALITY="ebook"
+DPI=300
 
-if [[ "${1:-}" == "--quality" ]]; then
-  QUALITY="$2"
+if [[ "${1:-}" == "--dpi" ]]; then
+  DPI="$2"
   shift 2
 fi
 
@@ -35,7 +37,7 @@ if ! command -v gs >/dev/null 2>&1; then
 fi
 
 if [[ $# -eq 0 ]]; then
-  echo "usage: $0 [--quality screen|ebook|printer] <file.pdf> [more.pdf ...]" >&2
+  echo "usage: $0 [--dpi 300|220|150] <file.pdf> [more.pdf ...]" >&2
   exit 1
 fi
 
@@ -58,10 +60,25 @@ for src in "$@"; do
   dest="$outdir/$(basename "$src")"
   before=$(size_of "$src")
 
+  # Kept in step with gsArgs() in services/compress.service.js — see the comment
+  # there for why every knob is set explicitly instead of using -dPDFSETTINGS.
   gs -sDEVICE=pdfwrite \
-     -dCompatibilityLevel=1.4 \
-     -dPDFSETTINGS="/$QUALITY" \
-     -dNOPAUSE -dQUIET -dBATCH \
+     -dCompatibilityLevel=1.5 \
+     -dNOPAUSE -dQUIET -dBATCH -dSAFER \
+     -dColorConversionStrategy=/sRGB \
+     -dDownsampleColorImages=true \
+     -dColorImageDownsampleType=/Bicubic \
+     -dColorImageResolution="$DPI" \
+     -dColorImageDownsampleThreshold=1.0 \
+     -dDownsampleGrayImages=true \
+     -dGrayImageDownsampleType=/Bicubic \
+     -dGrayImageResolution="$DPI" \
+     -dGrayImageDownsampleThreshold=1.0 \
+     -dAutoFilterColorImages=false \
+     -dColorImageFilter=/DCTEncode \
+     -dAutoFilterGrayImages=false \
+     -dGrayImageFilter=/DCTEncode \
+     -dJPEGQ=90 \
      -sOutputFile="$dest" "$src" 2>/dev/null
 
   if [[ ! -s "$dest" ]]; then
@@ -91,13 +108,14 @@ for src in "$@"; do
     over_limit=1
   fi
 
-  printf '%-8s %s — %s -> %s (-%s%%) %s\n' \
-    "done" "$(basename "$src")" "$(human "$before")" "$(human "$after")" "$pct" "$status"
+  printf '%-8s %s — %s -> %s (-%s%%) @ %s dpi %s\n' \
+    "done" "$(basename "$src")" "$(human "$before")" "$(human "$after")" "$pct" "$DPI" "$status"
 done
 
 if (( over_limit )); then
   echo
-  echo "Some files are still over $(human "$LIMIT"). Try --quality screen, or split the"
-  echo "PDF into parts and upload them as separate notes."
+  echo "Some files are still over $(human "$LIMIT"). Try --dpi 220, then --dpi 150."
+  echo "Below 150 dpi the text inside figures stops being readable — split the PDF"
+  echo "into parts and upload them as separate notes instead."
   exit 1
 fi

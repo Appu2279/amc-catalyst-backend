@@ -53,7 +53,7 @@ export const createNote = handle(async (req, res) => {
             compressed: true,
             original_bytes: compression.originalBytes,
             final_bytes: compression.finalBytes,
-            quality: compression.quality,
+            dpi: compression.dpi,
           }
         : { compressed: false },
     };
