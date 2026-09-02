@@ -73,6 +73,14 @@ export const togglePublish = async (id) => {
   return { is_published: test.is_published };
 };
 
+/** Marks a whole mock exam as a free sample, or takes it back. */
+export const toggleFree = async (id) => {
+  const test = await MockTest.findByPk(id);
+  if (!test) throw new AppError('Mock test not found', 404);
+  await test.update({ is_free: !test.is_free });
+  return { is_free: test.is_free };
+};
+
 export const addQuestions = async (testId, questions) => {
   const test = await MockTest.findByPk(testId);
   if (!test) throw new AppError('Mock test not found', 404);

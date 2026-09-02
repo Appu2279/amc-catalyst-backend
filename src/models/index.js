@@ -21,6 +21,7 @@ import ImportBatch from './importBatch.model.js';
 import AttemptQuestion from './attemptQuestion.model.js';
 import Note from './note.model.js';
 import QuestionProgress from './questionProgress.model.js';
+import PaymentClaim from './paymentClaim.model.js';
 
 // 🔗 Relationships
 
@@ -45,6 +46,24 @@ Subscription.belongsTo(User);
 
 Course.hasMany(Subscription, { foreignKey: 'course_id' });
 Subscription.belongsTo(Course);
+
+// PAYMENT CLAIMS — a user's unverified claim to have paid by QR transfer.
+// Resolving one is what creates the Subscription above.
+User.hasMany(PaymentClaim, { foreignKey: 'user_id' });
+PaymentClaim.belongsTo(User, { foreignKey: 'user_id', as: 'user' });
+
+// RESTRICT, not the default CASCADE: deleteCourse() is a hard destroy(), and a
+// course being removed must not take the record of what people paid for it with
+// it. This makes a course with payment history undeletable until someone
+// decides what should happen to that history — which is the right time to ask.
+Course.hasMany(PaymentClaim, { foreignKey: 'course_id', onDelete: 'RESTRICT' });
+PaymentClaim.belongsTo(Course, { foreignKey: 'course_id', as: 'course', onDelete: 'RESTRICT' });
+
+// Reviewer and resulting subscription are both informational links, without FK
+// constraints: deleting an admin account, or ending a subscription, must not
+// cascade away the record of why access was granted in the first place.
+PaymentClaim.belongsTo(User, { foreignKey: 'reviewed_by', as: 'reviewer', constraints: false });
+PaymentClaim.belongsTo(Subscription, { foreignKey: 'subscription_id', as: 'subscription', constraints: false });
 
 // SUBJECT -> TOPIC
 Subject.hasMany(Topic, {
@@ -170,4 +189,5 @@ export {
   AttemptQuestion,
   Note,
   QuestionProgress,
+  PaymentClaim,
 };

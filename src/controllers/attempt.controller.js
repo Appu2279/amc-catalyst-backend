@@ -18,7 +18,7 @@ export const getTestInfo = async (req, res) => {
 
 export const startAttempt = async (req, res) => {
   try {
-    const result = await AttemptService.startAttempt(req.user.id, req.params.id);
+    const result = await AttemptService.startAttempt(req.user, req.params.id);
     res.status(201).json(result);
   } catch (err) {
     res.status(err.status || 500).json({ message: err.message, ...err.data });

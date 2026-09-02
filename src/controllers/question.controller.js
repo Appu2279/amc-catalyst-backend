@@ -7,7 +7,7 @@ export const checkAnswer = async (req, res) => {
     const data = await QuestionService.checkAnswer(
       req.params.id,
       req.body.selected_option_id,
-      req.user?.id
+      req.user
     );
     res.json({ data });
   } catch (err) {
@@ -27,7 +27,7 @@ export const getPracticeProgress = async (req, res) => {
 // GET /api/questions/batches?source_type=recall
 export const listQuestionBatches = async (req, res) => {
   try {
-    res.json({ data: await QuestionService.listQuestionBatches(req.query, req.user?.id) });
+    res.json({ data: await QuestionService.listQuestionBatches(req.query, req.user) });
   } catch (err) {
     res.status(err.status || 500).json({ message: err.message });
   }
@@ -82,6 +82,14 @@ export const deleteQuestion = async (req, res) => {
   }
 };
 
+export const toggleQuestionFree = async (req, res) => {
+  try {
+    res.json(await QuestionService.toggleQuestionFree(req.params.id));
+  } catch (err) {
+    res.status(err.status || 500).json({ message: err.message });
+  }
+};
+
 export const toggleQuestion = async (req, res) => {
   try {
     res.json(await QuestionService.toggleQuestion(req.params.id));
@@ -92,7 +100,7 @@ export const toggleQuestion = async (req, res) => {
 
 export const listQuestions = async (req, res) => {
   try {
-    res.json(await QuestionService.listQuestions(req.query));
+    res.json(await QuestionService.listQuestions(req.query, req.user));
   } catch (err) {
     res.status(err.status || 500).json({ message: err.message });
   }
@@ -100,7 +108,7 @@ export const listQuestions = async (req, res) => {
 
 export const getQuestion = async (req, res) => {
   try {
-    res.json(await QuestionService.getQuestion(req.params.id));
+    res.json(await QuestionService.getQuestion(req.params.id, req.user));
   } catch (err) {
     res.status(err.status || 500).json({ message: err.message });
   }

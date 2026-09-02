@@ -16,8 +16,8 @@ const User = sequelize.define('User', {
   },
   email: {
     type: DataTypes.STRING,
-    unique: true,
     allowNull: false,
+    // Unique via the named index below — see the note on `indexes`.
   },
 
   password: {
@@ -77,6 +77,16 @@ const User = sequelize.define('User', {
 }, {
   timestamps: true,
   underscored: true,
+  indexes: [
+    // Unique constraints are declared here as NAMED indexes rather than with
+    // `unique: true` on the attribute. Sequelize cannot match an anonymous
+    // unique constraint to the one already in the database, so
+    // sync({ alter: true }) adds a fresh one on every boot — Postgres names each
+    // `<table>_<column>_key<N>`, and this database had built up 463 of them
+    // across four tables before the declarations moved here. A named index is
+    // matched by name and created once.
+    { name: 'users_email_unique', unique: true, fields: ['email'] },
+  ],
 });
 
 export default User;

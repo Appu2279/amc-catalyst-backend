@@ -1,20 +1,21 @@
 import fs from 'fs/promises';
 import path from 'path';
 import { Note } from '../models/index.js';
-import { compressToFit } from './compress.service.js';
+import { assertSectionAccess } from './entitlement.service.js';
+import { SECTIONS } from '../constants/sections.js';
 import { AppError } from '../utils/AppError.js';
-import { uploadNoteBuffer, destroyNoteAsset } from '../config/cloudinary.js';
+import { uploadNoteBuffer, destroyObject } from '../config/storage.js';
 
 const FOLDER = 'amc-catalyst/notes';
 
 /**
  * The only columns that ever reach a non-admin browser.
  *
- * storage_public_id and file_url are deliberately absent. A Cloudinary URL in
- * an API response is a permanent, unauthenticated way to read the file — it
- * would outlive the user's session, survive logout, and work for anyone it is
- * forwarded to. The browser gets an id; the bytes come back through
- * GET /api/notes/:id/file.
+ * storage_public_id and file_url are deliberately absent. An S3 key in an API
+ * response would be one more thing standing between "has this account paid"
+ * and "can read this file" — the bucket is private, so nothing can actually be
+ * fetched with it directly, but there is no reason to hand it out either. The
+ * browser gets an id; the bytes come back through GET /api/notes/:id/file.
  */
 const PUBLIC_ATTRIBUTES = [
   'id',
@@ -86,9 +87,9 @@ const bestEffortPageCount = (buffer) => {
 // caller-supplied, and a mislabelled file would upload happily and then fail in
 // the PDF viewer with no clue why.
 //
-// Reads only the header rather than the whole file: this runs before
-// compression, so rejecting a mislabelled 60MB file costs one disk read instead
-// of a minute of Ghostscript.
+// Reads only the header rather than the whole file: rejecting a mislabelled
+// 60MB file this way costs one disk read instead of reading and uploading the
+// whole thing first.
 const assertFileIsPdf = async (filePath) => {
   let handle;
   try {
@@ -126,24 +127,26 @@ export const listNotesAdmin = () =>
 /**
  * The single place note access is decided.
  *
- * Today every registered user may read every note, so this only rejects
- * anonymous callers. When notes become subscription-only, this is the function
- * to change — check the user's Subscription here and reject when `is_free` is
- * false. Nothing else needs to move, because no caller can reach the file
- * except through getNoteForViewing().
+ * No caller can reach the file except through getNoteForViewing(), and notes
+ * are stored as private objects in a bucket with all public access blocked,
+ * fetched server-side, so this check is the whole of the paywall — there is
+ * no public URL to leak past it.
  */
-const assertCanAccess = (note, user) => {
+const assertCanAccess = async (note, user) => {
   if (!user) throw new AppError('Unauthorized', 401);
   if (user.role === 'admin') return; // admins preview inactive notes
   if (!note.is_active) throw new AppError('Note not found', 404);
+
+  // Samples stay open to any signed-in user — that is what is_free is for.
   if (note.is_free) return;
-  throw new AppError('This note requires an active subscription', 403);
+
+  await assertSectionAccess(SECTIONS.NOTES, user);
 };
 
 export const getNoteForViewing = async (id, user) => {
   const note = await Note.findByPk(id);
   if (!note) throw new AppError('Note not found', 404);
-  assertCanAccess(note, user);
+  await assertCanAccess(note, user);
   return note;
 };
 
@@ -168,9 +171,14 @@ export const upsertNote = async (fields, createDefaults = {}) => {
 };
 
 /**
- * Upload bytes to Cloudinary and register the note. Shared by the admin upload
+ * Upload bytes to S3 and register the note. Shared by the admin upload
  * endpoint and scripts/upload-notes.js so both agree on validation, naming and
- * the private-asset settings.
+ * the private-object settings.
+ *
+ * Uploaded exactly as received — no compression, no downsampling. S3 has no
+ * practical size ceiling for a PDF of the kind this app handles, so unlike the
+ * old Cloudinary path there is nothing here trading image clarity for a
+ * storage limit.
  */
 export const publishNote = async ({
   filePath,
@@ -186,46 +194,32 @@ export const publishNote = async ({
   const slug = slugify(base);
   if (!slug) throw new AppError('Could not derive a filename for this note', 400);
 
-  // Oversized PDFs are shrunk here rather than being rejected: Cloudinary caps
-  // raw files at 10 MiB, and asking an admin to go and compress a file by hand
-  // before every upload is work the server can do itself.
-  const compression = await compressToFit(filePath);
+  const buffer = await fs.readFile(filePath);
+  const key = `${FOLDER}/${slug}.pdf`;
+  await uploadNoteBuffer(buffer, key);
 
-  try {
-    const buffer = await fs.readFile(compression.path);
-    const result = await uploadNoteBuffer(buffer, `${FOLDER}/${slug}`);
-
-    // Only fields the caller actually supplied are written. Re-uploading a file
-    // to replace its PDF must not blank out a description or reset a title that
-    // was edited after the original upload — the caller is replacing bytes, not
-    // clearing metadata.
-    const outcome = await upsertNote(
-      {
-        // public_id straight from the response — for raw assets Cloudinary
-        // appends the extension, and a hand-built id would not match at signing
-        // time.
-        storage_public_id: result.public_id,
-        file_url: result.secure_url,
-        file_size_bytes: result.bytes ?? buffer.length,
-        page_count: bestEffortPageCount(buffer),
-        is_active: true,
-        ...(title?.trim() ? { title: title.trim() } : {}),
-        ...(description === undefined ? {} : { description: description?.trim() || null }),
-        ...(sort_order === undefined ? {} : { sort_order }),
-        ...(created_by === undefined ? {} : { created_by }),
-      },
-      // title is NOT NULL, so a brand-new note always needs one.
-      { title: titleFromFilename(base) }
-    );
-
-    return { ...outcome, compression };
-  } finally {
-    // Only the compressed copy is ours to delete; the source belongs to the
-    // caller (multer's temp file, or a real file the upload script was given).
-    if (compression.compressed) {
-      await fs.unlink(compression.path).catch(() => {});
-    }
-  }
+  // Only fields the caller actually supplied are written. Re-uploading a file
+  // to replace its PDF must not blank out a description or reset a title that
+  // was edited after the original upload — the caller is replacing bytes, not
+  // clearing metadata.
+  return upsertNote(
+    {
+      storage_public_id: key,
+      // Not a working URL — the bucket blocks public access, so this 403s if
+      // opened directly. Kept only as a human-readable pointer to the object
+      // for admin/debugging; the app always reads the object back by key.
+      file_url: `s3://${process.env.S3_BUCKET}/${key}`,
+      file_size_bytes: buffer.length,
+      page_count: bestEffortPageCount(buffer),
+      is_active: true,
+      ...(title?.trim() ? { title: title.trim() } : {}),
+      ...(description === undefined ? {} : { description: description?.trim() || null }),
+      ...(sort_order === undefined ? {} : { sort_order }),
+      ...(created_by === undefined ? {} : { created_by }),
+    },
+    // title is NOT NULL, so a brand-new note always needs one.
+    { title: titleFromFilename(base) }
+  );
 };
 
 // Metadata only. Replacing a note's PDF is an upload, not an edit — that keeps
@@ -251,8 +245,8 @@ export const deleteNote = async (id) => {
 
   // Storage first: if this fails we still hold the row, so the orphan is
   // visible and retryable. Dropping the row first would strand a paid PDF in
-  // Cloudinary with nothing left pointing at it.
-  await destroyNoteAsset(note.storage_public_id);
+  // S3 with nothing left pointing at it.
+  await destroyObject(note.storage_public_id);
   await note.destroy();
 
   return { message: 'Note deleted' };

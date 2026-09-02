@@ -53,13 +53,17 @@ services:
       DB_SSL: 'false'
       JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env}
       CORS_ORIGIN: ${CORS_ORIGIN:?set CORS_ORIGIN in .env}
-      # Study notes are stored as private Cloudinary assets. Not marked
-      # required: without them the API still runs and everything except notes
-      # works, and the server logs a warning at boot rather than refusing to
-      # start. Opening a note returns a clear 503 instead of a broken page.
-      CLOUDINARY_CLOUD_NAME: ${CLOUDINARY_CLOUD_NAME}
-      CLOUDINARY_API_KEY: ${CLOUDINARY_API_KEY}
-      CLOUDINARY_API_SECRET: ${CLOUDINARY_API_SECRET}
+      # Study notes and payment screenshots are stored as private S3 objects.
+      # No access key/secret here on purpose: credentials come from the EC2
+      # instance's IAM role via instance metadata, not the environment. That
+      # requires the instance's metadata hop limit to be 2 (not the default 1)
+      # so a request from inside this container can reach it — see DEPLOY.md.
+      # Not marked required: without S3_BUCKET the API still runs and
+      # everything except notes works, and the server logs a warning at boot
+      # rather than refusing to start. Opening a note returns a clear 503
+      # instead of a broken page.
+      AWS_REGION: ${AWS_REGION:-ap-south-1}
+      S3_BUCKET: ${S3_BUCKET}
     expose:
       - '3000'
     depends_on:

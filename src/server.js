@@ -1,6 +1,6 @@
 import app from './app.js';
 import { sequelize } from './models/index.js';
-import { isCloudinaryConfigured } from './config/cloudinary.js';
+import { isStorageConfigured } from './config/storage.js';
 
 const PORT = process.env.PORT || 3000;
 const isProduction = process.env.NODE_ENV === 'production';
@@ -14,10 +14,10 @@ const start = async () => {
 
     // Surfaced at boot rather than discovered when a student opens a note and
     // gets a 503. Not fatal: everything except notes works without it.
-    if (!isCloudinaryConfigured) {
+    if (!isStorageConfigured) {
       console.warn(
-        'WARNING: Cloudinary is not configured — study notes cannot be uploaded or opened. ' +
-          'Set CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY and CLOUDINARY_API_SECRET.'
+        'WARNING: S3 storage is not configured — study notes cannot be uploaded or opened. ' +
+          'Set AWS_REGION and S3_BUCKET (and, outside EC2, AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY).'
       );
     }
 

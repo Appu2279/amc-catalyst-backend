@@ -41,6 +41,22 @@ const Course = sequelize.define('Course', {
     type: DataTypes.INTEGER,
     allowNull: true,
   },
+
+  /**
+   * Which parts of the product this plan grants, as section keys — see
+   * constants/sections.js. Sections inherited via inherits_from_course_id are
+   * NOT repeated here; list only what this tier adds.
+   *
+   * This is the *current* definition of the plan and is safe to edit: it is
+   * read when a subscription is granted and never again. Existing subscribers
+   * keep the sections that were copied onto their Subscription at the time
+   * they paid, so narrowing a plan does not narrow anyone's live access.
+   */
+  sections: {
+    type: DataTypes.JSONB,
+    allowNull: false,
+    defaultValue: [],
+  },
 }, {
   timestamps: true,
   underscored: true,

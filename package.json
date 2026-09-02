@@ -12,16 +12,18 @@
     "db:seed": "npx sequelize-cli db:seed:all --seeders-path seeders",
     "db:seed:undo": "npx sequelize-cli db:seed:undo:all --seeders-path seeders",
     "notes:upload": "node scripts/upload-notes.js",
-    "db:create-new": "node scripts/create-new-tables.js"
+    "db:create-new": "node scripts/create-new-tables.js",
+    "db:migrate-entitlements": "node scripts/migrate-subscription-entitlements.js",
+    "db:set-sections": "node scripts/set-course-sections.js"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "type": "module",
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1124.0",
     "@supabase/supabase-js": "^2.104.1",
     "bcrypt": "^6.0.0",
-    "cloudinary": "^2.10.1",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",

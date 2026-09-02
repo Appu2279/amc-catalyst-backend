@@ -16,9 +16,22 @@ export const getCourseById = async (req, res) => {
   }
 };
 
-export const subscribeCourse = async (req, res) => {
+// Admin-only. The user being granted access comes from the body, never from
+// req.user — an admin is acting on someone else's account, not their own.
+export const grantSubscription = async (req, res) => {
   try {
-    res.json(await CourseService.subscribeCourse(req.user.id, req.body.course_id));
+    const { user_id, course_id } = req.body;
+    if (!user_id || !course_id) {
+      return res.status(400).json({ message: 'user_id and course_id are required' });
+    }
+    // grantedBy is the admin making the call — the only provenance a manually
+    // granted subscription has, since there is no payment claim behind it.
+    res.status(201).json(
+      await CourseService.grantSubscription(user_id, course_id, {
+        grantedBy: req.user.id,
+        source: 'manual',
+      })
+    );
   } catch (err) {
     res.status(err.status || 500).json({ message: err.message });
   }

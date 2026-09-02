@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { verifyToken } from '../middleware/authMiddleware.js';
 import { isAdmin } from '../middleware/roleMiddleware.js';
 import {
-  adminListQuestions, adminGetQuestion, createQuestion, updateQuestion, deleteQuestion, toggleQuestion,
+  adminListQuestions, adminGetQuestion, createQuestion, updateQuestion, deleteQuestion, toggleQuestion, toggleQuestionFree,
   listQuestions, getQuestion, checkAnswer, getPracticeProgress, resetPracticeProgress,
   listQuestionBatches,
 } from '../controllers/question.controller.js';
@@ -16,6 +16,8 @@ router.post('/admin', verifyToken, isAdmin, createQuestion);
 router.put('/admin/:id', verifyToken, isAdmin, updateQuestion);
 router.delete('/admin/:id', verifyToken, isAdmin, deleteQuestion);
 router.patch('/admin/:id/toggle', verifyToken, isAdmin, toggleQuestion);
+// Marks a question as a free sample, visible to students without a plan.
+router.patch('/admin/:id/free', verifyToken, isAdmin, toggleQuestionFree);
 
 // Student routes — signed in only. The question bank is the paid product, so it
 // is never served anonymously; responses omit is_correct and explanation.

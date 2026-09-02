@@ -8,6 +8,7 @@ import {
   updateMockTest,
   deleteMockTest,
   togglePublish,
+  toggleFree,
   addQuestions,
   removeQuestion,
   getQuestionPool,
@@ -24,6 +25,8 @@ router.get('/:id', getMockTest);
 router.put('/:id', updateMockTest);
 router.delete('/:id', deleteMockTest);
 router.patch('/:id/publish', togglePublish);
+// Marks a whole exam as a free sample, sittable without a plan.
+router.patch('/:id/free', toggleFree);
 router.post('/:id/questions', addQuestions);
 router.delete('/:id/questions/:questionId', removeQuestion);
 

@@ -1,21 +1,21 @@
 /**
- * Upload study-note PDFs to Cloudinary and register them for the Notes page.
+ * Upload study-note PDFs to S3 and register them for the Notes page.
  *
  *   npm run notes:upload -- ./notes/*.pdf
  *
  * A bulk alternative to the admin UI (Admin → Notes), useful for seeding a
  * batch of files at once. Both go through publishNote() in note.service.js, so
- * validation, naming and the private-asset settings are identical either way.
+ * validation, naming and the private-object settings are identical either way.
  *
  * Titles come from filenames: "cardiology-basics.pdf" -> "Cardiology Basics".
  * Re-running on the same filename updates that note rather than creating a
  * duplicate; use the admin UI to set descriptions.
  *
- * Oversized PDFs are compressed automatically before upload, so there is no
- * need to run scripts/compress-notes.sh first.
+ * Files are uploaded exactly as given, at full quality — S3 has no size
+ * ceiling that matters here.
  */
 import path from 'path';
-import { isCloudinaryConfigured } from '../src/config/cloudinary.js';
+import { isStorageConfigured } from '../src/config/storage.js';
 import { sequelize, Note } from '../src/models/index.js';
 import { publishNote } from '../src/services/note.service.js';
 
@@ -27,10 +27,10 @@ const run = async () => {
     process.exit(1);
   }
 
-  if (!isCloudinaryConfigured) {
+  if (!isStorageConfigured) {
     console.error(
-      'Cloudinary is not configured. Set CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY\n' +
-        'and CLOUDINARY_API_SECRET in .env before running this.'
+      'S3 storage is not configured. Set AWS_REGION and S3_BUCKET (and, outside EC2,\n' +
+        'AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY) in .env before running this.'
     );
     process.exit(1);
   }
@@ -50,17 +50,14 @@ const run = async () => {
     const base = path.basename(file);
 
     try {
-      const { note, created: isNew, compression } = await publishNote({
+      const { note, created: isNew } = await publishNote({
         filePath: file,
         filename: base,
         sort_order: index,
       });
 
       isNew ? created++ : updated++;
-      const shrunk = compression.compressed
-        ? `  (compressed ${(compression.originalBytes / 1048576).toFixed(1)}MB -> ${(compression.finalBytes / 1048576).toFixed(1)}MB)`
-        : '';
-      console.log(`${isNew ? 'created' : 'updated'}  ${note.title}  (id ${note.id})${shrunk}`);
+      console.log(`${isNew ? 'created' : 'updated'}  ${note.title}  (id ${note.id})`);
     } catch (err) {
       failures.push(base);
       console.error(`failed   ${base}: ${err.message}`);

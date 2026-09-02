@@ -3,19 +3,16 @@ import path from 'path';
 import multer from 'multer';
 
 /**
- * Well above Cloudinary's 10 MiB ceiling on purpose: the server compresses
- * oversized PDFs before uploading them (see compressPdf in
- * services/compress.service.js), so what matters here is the size we are
- * willing to receive, not the size storage will accept.
+ * Notes are uploaded to S3 exactly as received, at full quality — nothing
+ * compresses them, so this is the real, final ceiling on a note's size, not a
+ * pre-compression buffer. Raise it if a genuinely larger note needs to go up.
  */
 const MAX_BYTES = 80 * 1024 * 1024;
 
 /**
- * Disk, not memory. Two reasons:
- *   • Ghostscript needs a real file path anyway, so a memory buffer would only
- *     be written to disk a moment later.
- *   • An 80MB cap with memoryStorage means one upload can pin 80MB of heap on
- *     a small instance. On disk it is a temp file the OS can page out.
+ * Disk, not memory. An 80MB cap with memoryStorage means one upload can pin
+ * 80MB of heap on a small instance; on disk it is a temp file the OS can page
+ * out.
  *
  * The controller is responsible for unlinking req.file.path — multer does not
  * clean up after itself.
@@ -46,6 +43,45 @@ export const uploadPdf = (req, res, next) =>
       return res
         .status(413)
         .json({ message: `That file is larger than ${MAX_BYTES / 1024 / 1024}MB` });
+    }
+
+    return res.status(400).json({ message: err.message });
+  });
+
+
+/**
+ * A single payment screenshot.
+ *
+ * Memory, not disk, and small: this is one phone screenshot on its way to S3,
+ * so it never needs a file path and should not leave a copy of someone's
+ * banking app on the server. The PDF path above is the opposite case for both
+ * reasons.
+ */
+const SCREENSHOT_MAX_BYTES = 5 * 1024 * 1024;
+
+const screenshotUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: SCREENSHOT_MAX_BYTES, files: 1 },
+  fileFilter: (req, file, cb) => {
+    // Only what a phone produces. This is the only check — unlike Cloudinary,
+    // S3 stores whatever bytes it is given under whatever Content-Type it is
+    // told, with no server-side validation that they are really an image. The
+    // browser-supplied mimetype here is therefore trivially spoofable; the
+    // stream-back in payment.controller.js sets X-Content-Type-Options: nosniff
+    // and Content-Disposition: inline as a second line of defence.
+    if (/^image\/(jpe?g|png|heic|heif|webp)$/i.test(file.mimetype)) return cb(null, true);
+    cb(new Error('Screenshot must be a JPEG, PNG, HEIC or WebP image'));
+  },
+});
+
+export const uploadScreenshot = (req, res, next) =>
+  screenshotUpload.single('screenshot')(req, res, (err) => {
+    if (!err) return next();
+
+    if (err.code === 'LIMIT_FILE_SIZE') {
+      return res
+        .status(413)
+        .json({ message: `Screenshot must be smaller than ${SCREENSHOT_MAX_BYTES / 1024 / 1024}MB` });
     }
 
     return res.status(400).json({ message: err.message });

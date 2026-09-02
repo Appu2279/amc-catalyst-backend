@@ -72,6 +72,24 @@ const ImportBatch = sequelize.define(
       allowNull: false,
       defaultValue: true,
     },
+
+    /**
+     * Opens this whole batch as a free sample.
+     *
+     * Batch-level because a recall month is 150 questions and nobody is going
+     * to flip 150 switches. The unit people actually think in is the month, so
+     * that is the unit this works on: give away an older sitting entire and
+     * keep the recent ones paid.
+     *
+     * A question is a sample if this is true OR its own is_free is set, so
+     * individual picks elsewhere still work — see sampleScope() in
+     * question.service.js.
+     */
+    is_free: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: false,
+    },
   },
   {
     tableName: 'import_batches',

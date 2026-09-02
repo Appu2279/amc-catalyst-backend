@@ -30,6 +30,18 @@ Region: **ap-south-1 (Mumbai)**.
 Then allocate an **Elastic IP** and associate it. A default public IP changes
 on every stop/start and silently breaks DNS.
 
+**IAM role:** attach a role granting `s3:PutObject`/`s3:GetObject`/`s3:DeleteObject`
+on the notes/screenshots bucket (Actions → Security → Modify IAM role). This is
+how the API authenticates to S3 in production — no access keys in `.env`.
+
+**Metadata hop limit:** Actions → Instance settings → Modify instance metadata
+options → set **Metadata response hop limit** to `2`. The API runs inside a
+Docker container, and a request from inside a container to the instance's
+metadata service (where the IAM role's temporary credentials come from) is one
+hop further than the default limit of 1 allows. Leaving this at 1 means the
+container gets no AWS credentials and every S3 call fails, while everything
+else works fine — a confusing failure mode to debug blind, so set it now.
+
 ## 2. Install Docker
 
 ```bash
@@ -73,12 +85,12 @@ JWT_SECRET=             # fresh, not the dev value: openssl rand -hex 32
 CORS_ORIGIN=https://yourdomain.com,https://www.yourdomain.com
 API_DOMAIN=api.yourdomain.com
 
-# Study notes are stored here as private assets. The same account the importer
-# uses for question images. Without these the API still runs, but notes cannot
-# be uploaded or opened and the server logs a warning at boot.
-CLOUDINARY_CLOUD_NAME=
-CLOUDINARY_API_KEY=
-CLOUDINARY_API_SECRET=
+# Study notes and payment screenshots are stored here as private S3 objects.
+# Leave the key/secret unset on EC2 — the instance's IAM role supplies
+# credentials automatically. Without S3_BUCKET set the API still runs, but
+# notes cannot be uploaded or opened and the server logs a warning at boot.
+AWS_REGION=ap-south-1
+S3_BUCKET=
 ```
 
 ## 5. Start
@@ -127,30 +139,79 @@ Expect **146 questions, 9 users, 4 courses**.
 
 ## 6b. Updating an existing deployment
 
+**Migrate before you cut over, not after.** Sequelize selects every attribute a
+model declares, so the instant the new code is *serving traffic* against a
+database still missing a column it added, every query that touches that table
+fails — not just the new feature, the whole table. `docker compose run` runs
+the new image's migration scripts as a one-off container, on the same database,
+**without** replacing the running (old-code) container — so the old code keeps
+serving normally for the entire window while the schema catches up to it.
+
 ```bash
 cd amc-catalyst-backend
 git pull
-docker compose -f docker-compose.prod.yml up -d --build
+docker compose -f docker-compose.prod.yml build api
 ```
 
-`--build` matters: the image installs Ghostscript, which compresses oversized
-note PDFs before upload.
-
-Then create anything the running database is missing. `sync()` is disabled in
-production, so new tables and columns are not created on boot:
+Then, still with the *old* container serving traffic:
 
 ```bash
-docker compose -f docker-compose.prod.yml exec api npm run db:create-new
+docker compose -f docker-compose.prod.yml run --rm api npm run db:create-new
+docker compose -f docker-compose.prod.yml run --rm api npm run db:set-sections
+docker compose -f docker-compose.prod.yml run --rm api npm run db:migrate-entitlements
 ```
 
-It reports what it created and what already existed, only ever adds what is
-missing, and is safe to re-run. Skipping it leaves recall progress and batch
-visibility broken, because `question_progress` and `import_batches.is_visible`
-will not exist.
+**This order matters, not just their presence.** `db:migrate-entitlements`
+snapshots every existing subscription's granted sections from its course's
+*current* `sections` column — run it before `db:set-sections` has populated
+real values there and every existing paying subscriber gets snapshotted with
+`granted_sections: []`, which the entitlement check reads as "grants nothing."
+That is every current customer locked out of what they already paid for, and
+`db:create-new` is what adds the `sections`/`granted_sections` columns in the
+first place, so it has to come first of the three.
+
+Read each command's output before moving to the next — `db:set-sections`
+prints `CANNOT BE SOLD` next to any plan it couldn't resolve sections for, and
+`db:migrate-entitlements` prints a `WARNING` line per subscription it could not
+reconstruct (its course was deleted before this migration ran). Stop and look
+into it rather than continuing on to the next command if either does.
+
+Once all three report clean, cut over:
+
+```bash
+docker compose -f docker-compose.prod.yml up -d api
+```
+
+`db:create-new` only ever adds what is missing and is safe to re-run;
+`db:set-sections` and `db:migrate-entitlements` are also safe to re-run — skip
+none of them, a partial run leaves the database in a state none of the code
+(old or new) was written against.
 
 Deploy the API **before** the frontend. The new frontend calls endpoints that
 only exist in this release, so shipping it first gives students a broken Notes
 and Recall until the API catches up.
+
+### S3 (Cloudinary → S3 migration)
+
+The API now reads `AWS_REGION`/`S3_BUCKET` from `.env` and gets credentials
+from the EC2 instance's IAM role — not from a key in the environment. Before
+this deploy:
+
+- The instance has an IAM role granting `s3:PutObject`/`s3:GetObject`/
+  `s3:DeleteObject` on the bucket (Instance → Actions → Security → Modify IAM
+  role).
+- **Metadata hop limit is 2, not the default 1** (Instance → Actions →
+  Instance settings → Modify instance metadata options). The API runs inside a
+  container, and a request from inside a container to the instance's metadata
+  service — where the role's credentials come from — is one hop further than
+  the default allows. Skip this and the container gets no AWS credentials at
+  all: every note upload/view and every payment screenshot fails with a 503,
+  while everything else works, which is a confusing thing to debug blind.
+- Any note uploaded before this migration has a Cloudinary-era
+  `storage_public_id` and no matching S3 object — opening it now 403s. Same
+  fix as we used locally: delete the row in Admin → Notes and re-upload the
+  original PDF, which registers it against S3 under a fresh key. Check
+  production's Notes list for any of these before announcing the release.
 
 ## 7. Backups — do this now, not later
 

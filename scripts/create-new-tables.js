@@ -15,11 +15,22 @@
  * Add a model here when you introduce one; remove it once the table exists
  * everywhere and the entry is just noise.
  */
-import { sequelize, Note, QuestionProgress, ImportBatch } from '../src/models/index.js';
+import {
+  sequelize,
+  Note,
+  QuestionProgress,
+  ImportBatch,
+  PaymentClaim,
+  Course,
+  Subscription,
+  Question,
+  MockTest,
+} from '../src/models/index.js';
 
 const MODELS = [
   ['notes', Note],
   ['question_progress', QuestionProgress],
+  ['payment_claims', PaymentClaim],
 ];
 
 /**
@@ -30,6 +41,21 @@ const MODELS = [
  */
 const COLUMNS = [
   ['import_batches', 'is_visible', ImportBatch],
+
+  // Entitlements. `courses.sections` is the editable definition of a plan;
+  // the three `subscriptions` columns are the snapshot taken when one is sold,
+  // which is what actually decides access. See subscription.model.js.
+  ['courses', 'sections', Course],
+  ['subscriptions', 'granted_sections', Subscription],
+  ['subscriptions', 'plan_title', Subscription],
+  ['subscriptions', 'source', Subscription],
+  ['subscriptions', 'granted_by', Subscription],
+
+  // Free samples. Opt-in per row, so both default to false and nothing becomes
+  // readable that was not already.
+  ['questions', 'is_free', Question],
+  ['mock_tests', 'is_free', MockTest],
+  ['import_batches', 'is_free', ImportBatch],
 ];
 
 const run = async () => {

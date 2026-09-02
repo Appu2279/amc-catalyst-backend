@@ -13,6 +13,8 @@ import bookmarkRoutes from './routes/bookmark.routes.js';
 import analyticsRoutes from './routes/analytics.routes.js';
 import noteRoutes from './routes/note.routes.js';
 import imageRoutes from './routes/image.routes.js';
+import meRoutes from './routes/me.routes.js';
+import paymentRoutes from './routes/payment.routes.js';
 
 const app = express();
 
@@ -49,5 +51,7 @@ app.use('/api/bookmarks', bookmarkRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/notes',    noteRoutes);
 app.use('/api/images',   imageRoutes);
+app.use('/api/me',       meRoutes);
+app.use('/api/payment-claims', paymentRoutes);
 
 export default app;

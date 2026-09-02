@@ -1,6 +1,8 @@
 import { Op } from 'sequelize';
 import { sequelize, MockTest, MockTestQuestion, Question, QuestionOption, UserMockAttempt, AttemptQuestion, UserAnswer } from '../models/index.js';
 import { AppError } from '../utils/AppError.js';
+import { assertSectionAccess } from './entitlement.service.js';
+import { SECTIONS } from '../constants/sections.js';
 
 export const listPublishedTests = () =>
   MockTest.findAll({
@@ -15,9 +17,22 @@ export const getTestInfo = async (id) => {
   return test;
 };
 
-export const startAttempt = async (userId, testId) => {
+export const startAttempt = async (user, testId) => {
   const test = await MockTest.findOne({ where: { id: testId, is_published: true } });
   if (!test) throw new AppError('Test not found', 404);
+
+  // The gate for mock exams. Listing and test info stay open — they are
+  // metadata a prospective buyer is meant to see — but sitting the exam is the
+  // paid product, and this is the only way in.
+  //
+  // A sample exam is the exception, and deliberately a generous one: finishing
+  // one full mock and seeing the score is the clearest picture a student can
+  // get of what they would be buying.
+  if (!test.is_free) {
+    await assertSectionAccess(SECTIONS.MOCKS, user);
+  }
+
+  const userId = user.id;
 
   const existing = await UserMockAttempt.findOne({
     where: { user_id: userId, mock_test_id: test.id, status: 'in_progress' },

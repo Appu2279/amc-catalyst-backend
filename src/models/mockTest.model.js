@@ -61,6 +61,19 @@ const MockTest = sequelize.define(
       defaultValue: false,
     },
 
+    /**
+     * A free sample exam, sittable without a plan.
+     *
+     * One full mock is the strongest thing you can hand someone who is still
+     * deciding — they finish it, see their score, and know exactly what they
+     * would be buying. Opt-in: everything else stays behind the paywall.
+     */
+    is_free: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: false,
+    },
+
     starts_at: {
       type: DataTypes.DATE,
     },

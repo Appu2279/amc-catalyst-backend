@@ -1,6 +1,8 @@
 import { Op } from 'sequelize';
 import { sequelize, Question, QuestionOption, Subject, Topic, QuestionProgress, ImportBatch } from '../models/index.js';
 import { AppError } from '../utils/AppError.js';
+import { assertSectionAccess, restrictToEntitled } from './entitlement.service.js';
+import { SECTIONS } from '../constants/sections.js';
 
 const buildWhere = (query) => {
   const { subject_id, topic_id, difficulty, question_type, source_type, search, is_active, import_batch_id } = query;
@@ -78,6 +80,57 @@ const inVisibleBatch = async () => {
   }
 
   return { [Op.and]: clauses };
+};
+
+/**
+ * The condition for "this question is a free sample".
+ *
+ * True when the question is flagged itself, or when it sits in a batch that has
+ * been opened wholesale. Recall is sold and consumed by the month, so giving a
+ * whole sitting away is the unit that makes sense there; individual flags cover
+ * qbank, where there are no batches to speak of.
+ *
+ * Batch ids are fetched first rather than filtered through
+ * `$import_batch.is_free$`, for the same reason inVisibleBatch does it — see
+ * the note there about the limit subquery.
+ */
+const sampleScope = async () => {
+  const freeBatches = await ImportBatch.findAll({
+    where: { is_free: true },
+    attributes: ['id'],
+  });
+
+  if (!freeBatches.length) return { is_free: true };
+
+  return {
+    [Op.or]: [
+      { is_free: true },
+      { import_batch_id: { [Op.in]: freeBatches.map((b) => b.id) } },
+    ],
+  };
+};
+
+/**
+ * Whether one already-loaded question counts as a sample.
+ *
+ * import_batch_id is deliberately excluded from the student payload (a student
+ * has no business knowing batch ids), so on that path the field is absent
+ * rather than null and has to be fetched. Absent and null mean different
+ * things here — null is "belongs to no batch", which is a real answer.
+ */
+const isSample = async (question) => {
+  if (question.is_free) return true;
+
+  const batchId =
+    question.import_batch_id === undefined
+      ? (await Question.findByPk(question.id, { attributes: ['import_batch_id'] }))
+          ?.import_batch_id
+      : question.import_batch_id;
+
+  if (!batchId) return false;
+
+  const batch = await ImportBatch.findByPk(batchId, { attributes: ['is_free'] });
+  return Boolean(batch?.is_free);
 };
 
 const subjectTopicIncludes = (withCorrect) => [
@@ -181,13 +234,91 @@ export const toggleQuestion = async (id) => {
   return { id: q.id, is_active: q.is_active };
 };
 
+/**
+ * Marks a question as a free sample, or takes it back behind the paywall.
+ *
+ * Its own endpoint rather than a field on updateQuestion: that one rewrites the
+ * whole question and its options in a transaction, which is far more than a
+ * single switch in a list should do.
+ */
+export const toggleQuestionFree = async (id) => {
+  const q = await Question.findByPk(id);
+  if (!q) throw new AppError('Question not found', 404);
+  await q.update({ is_free: !q.is_free });
+  return { id: q.id, is_free: q.is_free };
+};
+
 // ── Student ───────────────────────────────────────
 // The explanation is the teaching content students pay for — it is revealed one
 // question at a time by /check, never in a list a scraper can page through.
 const STUDENT_QUESTION_ATTRIBUTES = { exclude: ['explanation', 'created_by', 'import_batch_id'] };
 
-export const listQuestions = async (query) => {
-  const where = { ...buildWhere(query), is_active: true, ...(await inVisibleBatch()) };
+/**
+ * Which entitlement each kind of question falls under.
+ *
+ * 'previous_year' is treated as question-bank material — it is sold as part of
+ * the QBank rather than as its own product. Change the mapping here if that
+ * stops being true; nothing else needs to know.
+ */
+const SOURCE_TYPE_SECTIONS = Object.freeze({
+  qbank: SECTIONS.QBANK,
+  recall: SECTIONS.RECALL,
+  mock: SECTIONS.MOCKS,
+  previous_year: SECTIONS.QBANK,
+});
+
+const ALL_SOURCE_TYPES = Object.freeze(Object.keys(SOURCE_TYPE_SECTIONS));
+
+/**
+ * A where-fragment narrowing a listing to what this user may see.
+ *
+ * Narrows rather than rejects, because of samples. A student who has not paid
+ * still gets the questions marked is_free — that is the whole point of marking
+ * them — so asking for a section they do not hold returns the samples for it
+ * rather than a 403. An empty result is then honestly empty: there are no
+ * samples in that section.
+ *
+ * With no source_type at all the answer is "everything in the sections you
+ * hold, plus any sample anywhere", which is what a student browsing practice
+ * questions should see.
+ */
+const entitledScope = async (query, user) => {
+  const held = await restrictToEntitled(user, [...new Set(Object.values(SOURCE_TYPE_SECTIONS))]);
+
+  if (query?.source_type) {
+    const section = SOURCE_TYPE_SECTIONS[query.source_type];
+    if (!section) throw new AppError(`Unknown source_type "${query.source_type}"`, 400);
+    // buildWhere() already applied their source_type filter; all this adds is
+    // the sample restriction when they have not paid for that section.
+    return held.includes(section) ? {} : await sampleScope();
+  }
+
+  const allowed = ALL_SOURCE_TYPES.filter((type) => held.includes(SOURCE_TYPE_SECTIONS[type]));
+
+  return {
+    [Op.or]: [{ source_type: { [Op.in]: allowed } }, await sampleScope()],
+  };
+};
+
+/**
+ * Gate a single already-loaded question.
+ *
+ * A sample is open to any signed-in student, which is what makes it a sample.
+ * Everything else needs the section it belongs to.
+ */
+const assertQuestionAccess = async (question, user) => {
+  if (!user) throw new AppError('Unauthorized', 401);
+  if (await isSample(question)) return;
+  await assertSectionAccess(SOURCE_TYPE_SECTIONS[question.source_type] ?? SECTIONS.QBANK, user);
+};
+
+export const listQuestions = async (query, user) => {
+  const where = {
+    ...buildWhere(query),
+    is_active: true,
+    ...(await inVisibleBatch()),
+    ...(await entitledScope(query, user)),
+  };
   const { limit, offset, page } = paginate(query);
   const { count, rows } = await Question.findAndCountAll({
     where, attributes: STUDENT_QUESTION_ATTRIBUTES,
@@ -197,7 +328,7 @@ export const listQuestions = async (query) => {
   return { data: rows, pagination: { total: count, page, limit, pages: Math.ceil(count / limit) } };
 };
 
-export const getQuestion = async (id) => {
+export const getQuestion = async (id, user) => {
   const q = await Question.findOne({
     // Hidden batches are excluded here too, not just in the list: otherwise a
     // student who kept a question id could still fetch it after the batch was
@@ -207,16 +338,23 @@ export const getQuestion = async (id) => {
     include: subjectTopicIncludes(false),
   });
   if (!q) throw new AppError('Question not found', 404);
+  await assertQuestionAccess(q, user);
   return q;
 };
 
 // Called after the student picks an option — returns correct flag + full option details
-export const checkAnswer = async (questionId, selectedOptionId, userId) => {
+export const checkAnswer = async (questionId, selectedOptionId, user) => {
   const q = await Question.findOne({
     where: { id: questionId, is_active: true, ...(await inVisibleBatch()) },
     include: [{ model: QuestionOption, as: 'options' }],
   });
   if (!q) throw new AppError('Question not found', 404);
+
+  // Checked before the reveal, not just before the list: this endpoint returns
+  // the explanation, which is the part students actually pay for.
+  await assertQuestionAccess(q, user);
+
+  const userId = user?.id;
 
   const selected = q.options.find(o => o.id === selectedOptionId);
   if (!selected) throw new AppError('Option not found', 404);
@@ -386,7 +524,10 @@ export const resetPracticeProgress = async (userId, { source_type, import_batch_
  * Questions created by hand carry no batch. Rather than hiding them, they are
  * grouped under a single synthetic entry so they stay reachable.
  */
-export const listQuestionBatches = async ({ source_type } = {}, userId) => {
+export const listQuestionBatches = async ({ source_type } = {}, user) => {
+  const entitled = await entitledScope({ source_type }, user);
+  const userId = user?.id;
+
   const rows = await Question.findAll({
     attributes: [
       'import_batch_id',
@@ -395,6 +536,7 @@ export const listQuestionBatches = async ({ source_type } = {}, userId) => {
     where: {
       is_active: true,
       ...(source_type ? { source_type } : {}),
+      ...entitled,
       import_batch_id: { [Op.ne]: null },
       ...(await inVisibleBatch()),
     },
@@ -458,6 +600,20 @@ export const listQuestionBatches = async ({ source_type } = {}, userId) => {
  * Nothing is deleted: hiding is reversible, which is the point — a batch put up
  * for a demo can be taken down and restored later.
  */
+/**
+ * Opens or closes a whole batch as a free sample.
+ *
+ * Separate from visibility: hiding a batch takes it away from everyone,
+ * including subscribers. This only changes who has to have paid to see it.
+ */
+export const setBatchFree = async (id, isFree) => {
+  const batch = await ImportBatch.findByPk(id);
+  if (!batch) throw new AppError('Import batch not found', 404);
+
+  await batch.update({ is_free: Boolean(isFree) });
+  return { id: batch.id, title: batch.title, is_free: batch.is_free };
+};
+
 export const setBatchVisibility = async (id, isVisible) => {
   const batch = await ImportBatch.findByPk(id);
   if (!batch) throw new AppError('Import batch not found', 404);

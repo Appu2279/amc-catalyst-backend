@@ -16,13 +16,13 @@ const Subject = sequelize.define(
     name: {
       type: DataTypes.STRING,
       allowNull: false,
-      unique: true,
+      // Unique via the named index below — see the note on `indexes`.
     },
 
     slug: {
       type: DataTypes.STRING,
       allowNull: false,
-      unique: true,
+      // Unique via the named index below — see the note on `indexes`.
     },
 
     description: {
@@ -37,6 +37,17 @@ const Subject = sequelize.define(
   {
     tableName: 'subjects',
     underscored: true,
+    indexes: [
+      // Unique constraints are declared here as NAMED indexes rather than with
+      // `unique: true` on the attribute. Sequelize cannot match an anonymous
+      // unique constraint to the one already in the database, so
+      // sync({ alter: true }) adds a fresh one on every boot — Postgres names each
+      // `<table>_<column>_key<N>`, and this database had built up 463 of them
+      // across four tables before the declarations moved here. A named index is
+      // matched by name and created once.
+      { name: 'subjects_name_unique', unique: true, fields: ['name'] },
+      { name: 'subjects_slug_unique', unique: true, fields: ['slug'] },
+    ],
   }
 );
 

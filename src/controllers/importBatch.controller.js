@@ -41,6 +41,17 @@ export const approveBatch = async (req, res) => {
   }
 };
 
+// PATCH /api/admin/import-batches/:id/free  { is_free: boolean }
+// Opens a whole recall month as a free sample. Distinct from visibility, which
+// takes a batch away from paying students too.
+export const setBatchFree = async (req, res) => {
+  try {
+    res.json({ data: await QuestionService.setBatchFree(req.params.id, req.body.is_free) });
+  } catch (err) {
+    res.status(err.status || 500).json({ message: err.message });
+  }
+};
+
 // PATCH /api/admin/import-batches/:id/visibility  { is_visible: boolean }
 // Shows or hides a whole recall batch for students. Nothing is deleted.
 export const setBatchVisibility = async (req, res) => {

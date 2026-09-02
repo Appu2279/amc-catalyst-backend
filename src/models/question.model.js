@@ -50,6 +50,20 @@ const Question = sequelize.define(
       defaultValue: 'single_choice',
     },
 
+
+    /**
+     * A free sample, usable without a plan.
+     *
+     * Samples are the only way a student who has not paid can judge whether the
+     * material is worth buying, so a handful of good ones earn their keep. They
+     * are opt-in: anything not explicitly marked stays behind the paywall.
+     */
+    is_free: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: false,
+    },
+
     source_type: {
       type: DataTypes.ENUM(
         'qbank',

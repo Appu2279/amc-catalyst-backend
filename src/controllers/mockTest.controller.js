@@ -48,6 +48,14 @@ export const togglePublish = async (req, res) => {
   }
 };
 
+export const toggleFree = async (req, res) => {
+  try {
+    res.json(await MockTestService.toggleFree(req.params.id));
+  } catch (err) {
+    res.status(err.status || 500).json({ message: err.message });
+  }
+};
+
 export const addQuestions = async (req, res) => {
   try {
     res.status(201).json(await MockTestService.addQuestions(req.params.id, req.body.questions));
