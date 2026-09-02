@@ -40,6 +40,11 @@ find "$BACKUP_DIR" -name 'amc_catalyst_*.sql.gz' -mtime "+$RETENTION_DAYS" -dele
 
 echo "$(date -Is) OK: $target ($((size / 1024)) KB)"
 
-# Strongly recommended: copy off the instance, so a lost volume or terminated
-# machine does not take the backups with it.
-#   aws s3 cp "$target" s3://your-bucket/backups/
+# Off the instance, so a lost volume or terminated machine does not take the
+# backups with it. Uses the EC2 instance's IAM role — the same one the API
+# container uses for notes/screenshots, whose policy already covers this
+# bucket's full key space (see config/storage.js), so no extra AWS setup was
+# needed beyond installing the CLI. Deliberately not the same key prefix as
+# application data — a stray `aws s3 rm --recursive` on one must not touch the
+# other.
+aws s3 cp "$target" "s3://${S3_BUCKET:?set S3_BUCKET in .env}/backups/"
