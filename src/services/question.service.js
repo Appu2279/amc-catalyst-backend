@@ -548,7 +548,7 @@ export const listQuestionBatches = async ({ source_type } = {}, user) => {
         required: true,
       },
     ],
-    group: ['Question.import_batch_id', 'import_batch.id', 'import_batch.is_free', 'import_batch.createdAt'],
+    group: ['Question.import_batch_id', 'import_batch.id', 'import_batch.is_free', 'import_batch.created_at'],
     raw: true,
     nest: true,
   });
