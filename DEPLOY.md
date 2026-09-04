@@ -91,6 +91,13 @@ API_DOMAIN=api.yourdomain.com
 # notes cannot be uploaded or opened and the server logs a warning at boot.
 AWS_REGION=ap-south-1
 S3_BUCKET=
+
+# Payment-approval and (future) verification emails, sent via Resend.
+# Leave RESEND_API_KEY unset and the API still runs — sendEmail in
+# config/email.js just logs and skips instead of sending.
+RESEND_API_KEY=
+EMAIL_FROM="AMC Catalyst <support@amccatalyst.com>"
+FRONTEND_URL=https://www.amccatalyst.com
 ```
 
 ## 5. Start

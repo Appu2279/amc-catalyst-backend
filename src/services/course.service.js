@@ -1,3 +1,4 @@
+import { Op } from 'sequelize';
 import { sequelize, Course, CoursePricing, Feature, Benefit, Subscription, User, PaymentClaim } from '../models/index.js';
 import { AppError } from '../utils/AppError.js';
 import { normaliseSections } from '../constants/sections.js';
@@ -81,8 +82,17 @@ export const grantSubscription = async (
   // Granting a second active subscription to the same course would leave two
   // rows disagreeing about when access ends. Extending an existing one is a
   // different operation and needs its own decision about the new end date.
+  // Excludes expired rows deliberately: status stays 'active' forever once
+  // set (nothing flips it — see entitlement.service.js, access is decided
+  // live from end_date on every check), so this must filter end_date the
+  // same way or a lapsed plan would permanently block its own renewal.
   const existing = await Subscription.findOne({
-    where: { user_id: userId, course_id: courseId, status: 'active' },
+    where: {
+      user_id: userId,
+      course_id: courseId,
+      status: 'active',
+      end_date: { [Op.gt]: new Date() },
+    },
     transaction,
   });
   if (existing) {

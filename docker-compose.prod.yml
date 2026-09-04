@@ -64,6 +64,12 @@ services:
       # instead of a broken page.
       AWS_REGION: ${AWS_REGION:-ap-south-1}
       S3_BUCKET: ${S3_BUCKET}
+      # Payment-approval and (future) verification emails. Not marked
+      # required: without RESEND_API_KEY the API still runs — sendEmail in
+      # config/email.js just logs and skips instead of sending.
+      RESEND_API_KEY: ${RESEND_API_KEY}
+      EMAIL_FROM: ${EMAIL_FROM}
+      FRONTEND_URL: ${FRONTEND_URL}
     expose:
       - '3000'
     depends_on:

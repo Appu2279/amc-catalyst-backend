@@ -4,6 +4,7 @@ import { sequelize, PaymentClaim, Course, CoursePricing, User, Subscription } fr
 import { AppError } from '../utils/AppError.js';
 import { grantSubscription } from './course.service.js';
 import { uploadPaymentScreenshot, isStorageConfigured } from '../config/storage.js';
+import { sendPaymentApprovedEmail } from './email.service.js';
 
 /**
  * The manual payment workflow: a user says they paid by QR, an admin checks the
@@ -273,7 +274,9 @@ export const listClaims = async ({ status = 'pending', include_unsubmitted } = {
  * kind of drift that makes a manual process untrustworthy.
  */
 export const approveClaim = async (claimId, adminId, { note } = {}) => {
-  const claim = await PaymentClaim.findByPk(claimId);
+  const claim = await PaymentClaim.findByPk(claimId, {
+    include: [{ model: User, as: 'user', attributes: ['id', 'fullName', 'email'] }],
+  });
   if (!claim) throw new AppError('Payment claim not found', 404);
 
   if (claim.status !== 'pending') {
@@ -300,6 +303,12 @@ export const approveClaim = async (claimId, adminId, { note } = {}) => {
     );
 
     await transaction.commit();
+
+    // Outside the transaction and deliberately not awaited into a failure
+    // path: the approval has already happened, and a slow or failed email
+    // must not turn a successful admin action into an error response.
+    sendPaymentApprovedEmail(claim.user, subscription);
+
     return { claim, subscription };
   } catch (err) {
     await transaction.rollback();

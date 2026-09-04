@@ -525,7 +525,6 @@ export const resetPracticeProgress = async (userId, { source_type, import_batch_
  * grouped under a single synthetic entry so they stay reachable.
  */
 export const listQuestionBatches = async ({ source_type } = {}, user) => {
-  const entitled = await entitledScope({ source_type }, user);
   const userId = user?.id;
 
   const rows = await Question.findAll({
@@ -536,7 +535,6 @@ export const listQuestionBatches = async ({ source_type } = {}, user) => {
     where: {
       is_active: true,
       ...(source_type ? { source_type } : {}),
-      ...entitled,
       import_batch_id: { [Op.ne]: null },
       ...(await inVisibleBatch()),
     },
@@ -544,13 +542,13 @@ export const listQuestionBatches = async ({ source_type } = {}, user) => {
       {
         model: ImportBatch,
         as: 'import_batch',
-        attributes: ['id', 'title', 'createdAt'],
+        attributes: ['id', 'title', 'is_free', 'createdAt'],
         // Inner join: this endpoint answers "which batches can I practise",
         // and a question with no batch is not an answer to that.
         required: true,
       },
     ],
-    group: ['Question.import_batch_id', 'import_batch.id'],
+    group: ['Question.import_batch_id', 'import_batch.id', 'import_batch.is_free', 'import_batch.createdAt'],
     raw: true,
     nest: true,
   });
@@ -586,6 +584,7 @@ export const listQuestionBatches = async ({ source_type } = {}, user) => {
     .map((r) => ({
       id: r.import_batch_id,
       title: r.import_batch.title,
+      is_free: Boolean(r.import_batch?.is_free),
       question_count: Number(r.question_count),
       answered_count: answeredByBatch.get(r.import_batch_id) ?? 0,
       created_at: r.import_batch.createdAt,
