@@ -4,11 +4,14 @@ import { AppError } from '../utils/AppError.js';
 import { assertSectionAccess } from './entitlement.service.js';
 import { SECTIONS } from '../constants/sections.js';
 
+// Free sample exams lead the list regardless of when they were uploaded — a
+// prospective buyer should see "try this one free" before "buy this one",
+// not whichever happens to be newest.
 export const listPublishedTests = () =>
   MockTest.findAll({
     where: { is_published: true },
     attributes: { exclude: ['configuration_json'] },
-    order: [['created_at', 'DESC']],
+    order: [['is_free', 'DESC'], ['created_at', 'DESC']],
   });
 
 export const getTestInfo = async (id) => {

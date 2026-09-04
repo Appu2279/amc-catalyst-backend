@@ -589,8 +589,10 @@ export const listQuestionBatches = async ({ source_type } = {}, user) => {
       answered_count: answeredByBatch.get(r.import_batch_id) ?? 0,
       created_at: r.import_batch.createdAt,
     }))
-    // Newest batch first — that is the one students want by default.
-    .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    // Free batches lead regardless of upload order — a prospective buyer
+    // should see "try this one free" before "buy this one". Newest first
+    // within each group.
+    .sort((a, b) => (b.is_free - a.is_free) || (new Date(b.created_at) - new Date(a.created_at)));
 };
 
 /**
