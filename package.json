@@ -14,7 +14,8 @@
     "notes:upload": "node scripts/upload-notes.js",
     "db:create-new": "node scripts/create-new-tables.js",
     "db:migrate-entitlements": "node scripts/migrate-subscription-entitlements.js",
-    "db:set-sections": "node scripts/set-course-sections.js"
+    "db:set-sections": "node scripts/set-course-sections.js",
+    "referral:backfill": "node scripts/backfill-referral-codes.js"
   },
   "keywords": [],
   "author": "",

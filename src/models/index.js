@@ -22,6 +22,10 @@ import AttemptQuestion from './attemptQuestion.model.js';
 import Note from './note.model.js';
 import QuestionProgress from './questionProgress.model.js';
 import PaymentClaim from './paymentClaim.model.js';
+import ReferralConfig from './referralConfig.model.js';
+import ReferralCode from './referralCode.model.js';
+import Referral from './referral.model.js';
+import ReferralReward from './referralReward.model.js';
 
 // 🔗 Relationships
 
@@ -64,6 +68,22 @@ PaymentClaim.belongsTo(Course, { foreignKey: 'course_id', as: 'course', onDelete
 // cascade away the record of why access was granted in the first place.
 PaymentClaim.belongsTo(User, { foreignKey: 'reviewed_by', as: 'reviewer', constraints: false });
 PaymentClaim.belongsTo(Subscription, { foreignKey: 'subscription_id', as: 'subscription', constraints: false });
+
+// REFERRALS
+//
+// All links are informational — no FK constraints. Removing an account, a code
+// or a payment claim must never cascade away the record of who referred whom or
+// what was paid out. The service layer resolves what it needs by id.
+ReferralCode.belongsTo(User, { foreignKey: 'owner_user_id', as: 'owner', constraints: false });
+ReferralCode.belongsTo(User, { foreignKey: 'created_by', as: 'creator', constraints: false });
+
+Referral.belongsTo(ReferralCode, { foreignKey: 'referral_code_id', as: 'code', constraints: false });
+ReferralCode.hasMany(Referral, { foreignKey: 'referral_code_id', as: 'referrals', constraints: false });
+Referral.belongsTo(User, { foreignKey: 'referred_user_id', as: 'referred_user', constraints: false });
+
+ReferralReward.belongsTo(Referral, { foreignKey: 'referral_id', as: 'referral', constraints: false });
+Referral.hasMany(ReferralReward, { foreignKey: 'referral_id', as: 'rewards', constraints: false });
+ReferralReward.belongsTo(User, { foreignKey: 'beneficiary_user_id', as: 'beneficiary', constraints: false });
 
 // SUBJECT -> TOPIC
 Subject.hasMany(Topic, {
@@ -190,4 +210,8 @@ export {
   Note,
   QuestionProgress,
   PaymentClaim,
+  ReferralConfig,
+  ReferralCode,
+  Referral,
+  ReferralReward,
 };

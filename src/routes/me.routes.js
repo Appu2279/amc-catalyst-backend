@@ -9,6 +9,7 @@ import {
   deleteMyAvatar,
   streamMyAvatar,
 } from '../controllers/me.controller.js';
+import { getMyReferral } from '../controllers/referral.controller.js';
 
 const router = Router();
 
@@ -17,6 +18,7 @@ const router = Router();
 router.use(verifyToken);
 
 router.get('/access', getMyAccess);
+router.get('/referral', getMyReferral);
 
 router.get('/avatar', streamMyAvatar);
 router.post('/avatar', uploadAvatar, uploadMyAvatar);

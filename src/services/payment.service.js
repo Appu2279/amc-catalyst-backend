@@ -3,6 +3,7 @@ import { Op, UniqueConstraintError } from 'sequelize';
 import { sequelize, PaymentClaim, Course, CoursePricing, User, Subscription } from '../models/index.js';
 import { AppError } from '../utils/AppError.js';
 import { grantSubscription } from './course.service.js';
+import { qualifyReferralForPayment } from './referral.service.js';
 import { uploadPaymentScreenshot, isStorageConfigured } from '../config/storage.js';
 import { sendPaymentApprovedEmail } from './email.service.js';
 
@@ -301,6 +302,12 @@ export const approveClaim = async (claimId, adminId, { note } = {}) => {
       },
       { transaction }
     );
+
+    // If this buyer was referred, their first approved payment is what makes
+    // the referral count. Safe to call on every approval — only the first one
+    // moves anything (see qualifyReferralForPayment). In the same transaction
+    // so a committed approval always carries its referral side-effects.
+    await qualifyReferralForPayment(claim.user_id, claim.id, { transaction });
 
     await transaction.commit();
 

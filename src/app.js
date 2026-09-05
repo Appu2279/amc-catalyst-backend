@@ -15,6 +15,7 @@ import noteRoutes from './routes/note.routes.js';
 import imageRoutes from './routes/image.routes.js';
 import meRoutes from './routes/me.routes.js';
 import paymentRoutes from './routes/payment.routes.js';
+import referralRoutes from './routes/referral.routes.js';
 
 const app = express();
 
@@ -53,5 +54,6 @@ app.use('/api/notes',    noteRoutes);
 app.use('/api/images',   imageRoutes);
 app.use('/api/me',       meRoutes);
 app.use('/api/payment-claims', paymentRoutes);
+app.use('/api/admin/referrals', referralRoutes);
 
 export default app;
