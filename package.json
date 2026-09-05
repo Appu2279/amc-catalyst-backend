@@ -15,7 +15,10 @@
     "db:create-new": "node scripts/create-new-tables.js",
     "db:migrate-entitlements": "node scripts/migrate-subscription-entitlements.js",
     "db:set-sections": "node scripts/set-course-sections.js",
-    "referral:backfill": "node scripts/backfill-referral-codes.js"
+    "referral:backfill": "node scripts/backfill-referral-codes.js",
+    "mocks:export": "node scripts/export-mock-tests.js",
+    "mocks:import": "node scripts/import-mock-tests.js",
+    "mocks:import:api": "node scripts/import-mock-tests-api.js"
   },
   "keywords": [],
   "author": "",

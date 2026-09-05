@@ -103,6 +103,14 @@ temp/
 
 # ========================
 
+# Exported question/mock data (paid content — keep answer keys out of git)
+
+# ========================
+
+scripts/data/
+
+# ========================
+
 # Mac system files
 
 # ========================

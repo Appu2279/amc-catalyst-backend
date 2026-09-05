@@ -109,3 +109,35 @@ export const uploadAvatar = (req, res, next) =>
 
     return res.status(400).json({ message: err.message });
   });
+
+
+/**
+ * A single question figure on its way to S3, uploaded by the import service.
+ *
+ * Memory, not disk — one cropped X-ray / clinical photo per call. Kept in the
+ * low-MB range: these are region crops of a PDF page, not full-resolution
+ * scans.
+ */
+const QUESTION_IMAGE_MAX_BYTES = 8 * 1024 * 1024;
+
+const questionImageUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: QUESTION_IMAGE_MAX_BYTES, files: 1 },
+  fileFilter: (req, file, cb) => {
+    if (/^image\/(jpe?g|png|webp|gif)$/i.test(file.mimetype)) return cb(null, true);
+    cb(new Error('Question image must be a JPEG, PNG, WebP or GIF image'));
+  },
+});
+
+export const uploadQuestionImage = (req, res, next) =>
+  questionImageUpload.single('image')(req, res, (err) => {
+    if (!err) return next();
+
+    if (err.code === 'LIMIT_FILE_SIZE') {
+      return res
+        .status(413)
+        .json({ message: `Question image must be smaller than ${QUESTION_IMAGE_MAX_BYTES / 1024 / 1024}MB` });
+    }
+
+    return res.status(400).json({ message: err.message });
+  });

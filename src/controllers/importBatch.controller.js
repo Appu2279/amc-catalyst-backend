@@ -1,5 +1,41 @@
+import crypto from 'crypto';
 import * as QuestionService from '../services/question.service.js';
 import * as ImportBatchService from '../services/importBatch.service.js';
+import { uploadQuestionImage as putQuestionImage, isStorageConfigured } from '../config/storage.js';
+
+const EXT_BY_MIME = {
+  'image/jpeg': 'jpg',
+  'image/jpg': 'jpg',
+  'image/png': 'png',
+  'image/webp': 'webp',
+  'image/gif': 'gif',
+};
+
+/**
+ * Stores one question figure and hands back the path the question row should
+ * carry. The import service (which has no AWS credentials of its own) posts the
+ * cropped image here; students later read it back through
+ * GET /api/images/question — the object itself stays private on S3.
+ */
+export const uploadImage = async (req, res) => {
+  try {
+    if (!isStorageConfigured) {
+      return res.status(503).json({ message: 'File storage is not configured on this server' });
+    }
+    if (!req.file?.buffer?.length) {
+      return res.status(400).json({ message: 'No image uploaded' });
+    }
+
+    const ext = EXT_BY_MIME[req.file.mimetype] || 'png';
+    const key = `question-images/${crypto.randomUUID()}.${ext}`;
+    await putQuestionImage(req.file.buffer, key, req.file.mimetype);
+
+    res.status(201).json({ key, path: `/api/images/question?key=${encodeURIComponent(key)}` });
+  } catch (err) {
+    console.error('Question image upload failed:', err.message);
+    res.status(500).json({ message: 'Could not store the image' });
+  }
+};
 
 export const listBatches = async (req, res) => {
   try {

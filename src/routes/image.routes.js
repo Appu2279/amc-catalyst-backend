@@ -3,8 +3,43 @@ import { verifyToken } from '../middleware/authMiddleware.js';
 import https from 'https';
 import http from 'http';
 import { URL } from 'url';
+import { getObjectBuffer, isStorageConfigured } from '../config/storage.js';
 
 const router = Router();
+
+/**
+ * GET /api/images/question?key=question-images/<uuid>.<ext>
+ *
+ * Streams a question figure stored on the private S3 bucket by the import
+ * service. The key is opaque (a UUID) and constrained to the question-images/
+ * prefix, so this cannot be used to read anything else in the bucket. Any
+ * signed-in user may fetch — the figure is only meaningful next to its question,
+ * which has its own entitlement check.
+ */
+router.get('/question', verifyToken, async (req, res) => {
+  const key = String(req.query.key || '');
+  if (!/^question-images\/[A-Za-z0-9-]+\.(jpg|jpeg|png|webp|gif)$/.test(key)) {
+    return res.status(400).json({ message: 'Invalid image key' });
+  }
+  if (!isStorageConfigured) {
+    return res.status(503).json({ message: 'File storage is not configured on this server' });
+  }
+
+  let object;
+  try {
+    object = await getObjectBuffer(key);
+  } catch (err) {
+    return res.status(404).json({ message: 'Image not found' });
+  }
+
+  res.set({
+    'Content-Type': object.contentType || 'image/png',
+    'Cache-Control': 'private, max-age=86400',
+    'Content-Disposition': 'inline',
+    'X-Content-Type-Options': 'nosniff',
+  });
+  res.end(object.buffer);
+});
 
 /**
  * GET /api/images/proxy?url=<encoded-image-url>
