@@ -84,7 +84,9 @@ export const login = async (email, password) => {
   );
 
   // Never ship the password hash to the client — it ends up in localStorage.
-  const { password: _hash, ...safeUser } = user.toJSON();
+  // avatarUrl is a raw S3 key with no client use; expose only whether one is set
+  // (the picture itself comes from GET /api/me/avatar).
+  const { password: _hash, avatarUrl, ...safeUser } = user.toJSON();
 
-  return { token, user: safeUser };
+  return { token, user: { ...safeUser, hasAvatar: Boolean(avatarUrl) } };
 };

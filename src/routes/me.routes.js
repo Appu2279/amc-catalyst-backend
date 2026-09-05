@@ -1,6 +1,14 @@
 import { Router } from 'express';
 import { verifyToken } from '../middleware/authMiddleware.js';
-import { getMyAccess } from '../controllers/me.controller.js';
+import { uploadAvatar } from '../middleware/uploadMiddleware.js';
+import {
+  getMyAccess,
+  getMyProfile,
+  updateMyProfile,
+  uploadMyAvatar,
+  deleteMyAvatar,
+  streamMyAvatar,
+} from '../controllers/me.controller.js';
 
 const router = Router();
 
@@ -9,5 +17,12 @@ const router = Router();
 router.use(verifyToken);
 
 router.get('/access', getMyAccess);
+
+router.get('/avatar', streamMyAvatar);
+router.post('/avatar', uploadAvatar, uploadMyAvatar);
+router.delete('/avatar', deleteMyAvatar);
+
+router.get('/', getMyProfile);
+router.patch('/', updateMyProfile);
 
 export default router;

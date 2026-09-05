@@ -77,3 +77,35 @@ export const uploadScreenshot = (req, res, next) =>
 
     return res.status(400).json({ message: err.message });
   });
+
+
+/**
+ * A single profile picture.
+ *
+ * Memory, not disk — same reasoning as the payment screenshot: one image on its
+ * way to S3, no reason to leave a copy on the server. Kept small because it is
+ * only ever displayed as a ~40px circle.
+ */
+const AVATAR_MAX_BYTES = 3 * 1024 * 1024;
+
+const avatarUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: AVATAR_MAX_BYTES, files: 1 },
+  fileFilter: (req, file, cb) => {
+    if (/^image\/(jpe?g|png|webp|gif)$/i.test(file.mimetype)) return cb(null, true);
+    cb(new Error('Profile picture must be a JPEG, PNG, WebP or GIF image'));
+  },
+});
+
+export const uploadAvatar = (req, res, next) =>
+  avatarUpload.single('avatar')(req, res, (err) => {
+    if (!err) return next();
+
+    if (err.code === 'LIMIT_FILE_SIZE') {
+      return res
+        .status(413)
+        .json({ message: `Profile picture must be smaller than ${AVATAR_MAX_BYTES / 1024 / 1024}MB` });
+    }
+
+    return res.status(400).json({ message: err.message });
+  });

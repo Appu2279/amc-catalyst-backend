@@ -58,6 +58,15 @@ const User = sequelize.define('User', {
     },
   },
 
+  // Private S3 object key for the profile picture, e.g.
+  // 'avatars/21-1788623746123'. Never handed to the browser as-is — the client
+  // reads it back through GET /api/me/avatar, which streams the bytes with the
+  // app's own credentials. Null means "no picture, fall back to initials".
+  avatarUrl: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+
   graduationYear: {
     type: DataTypes.INTEGER,
     allowNull: true,

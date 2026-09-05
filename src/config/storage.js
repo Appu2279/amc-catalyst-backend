@@ -45,6 +45,9 @@ export const uploadNoteBuffer = (buffer, key) => putObject(buffer, key, 'applica
 export const uploadPaymentScreenshot = (buffer, key, contentType) =>
   putObject(buffer, key, contentType);
 
+export const uploadAvatar = (buffer, key, contentType) =>
+  putObject(buffer, key, contentType);
+
 /**
  * Fetches a private object's bytes and content type.
  *
