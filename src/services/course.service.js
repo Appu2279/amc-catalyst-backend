@@ -12,8 +12,12 @@ const courseIncludes = [
   { model: Course, as: 'inherits_from', attributes: ['id', 'title'] },
 ];
 
-export const getCourses = () =>
+// Retired plans (is_active: false) are hidden from the public pricing page
+// but still need to show up for an admin managing courses, so they can see
+// and re-activate them.
+export const getCourses = ({ includeInactive = false } = {}) =>
   Course.findAll({
+    where: includeInactive ? {} : { is_active: true },
     include: courseIncludes,
     order: [['sort_order', 'ASC'], ['id', 'ASC']],
   });

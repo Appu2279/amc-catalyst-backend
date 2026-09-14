@@ -2,7 +2,8 @@ import * as CourseService from '../services/course.service.js';
 
 export const getCourses = async (req, res) => {
   try {
-    res.json(await CourseService.getCourses());
+    const includeInactive = req.user?.role === 'admin';
+    res.json(await CourseService.getCourses({ includeInactive }));
   } catch (err) {
     res.status(err.status || 500).json({ message: err.message });
   }

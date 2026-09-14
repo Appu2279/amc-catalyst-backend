@@ -9,13 +9,14 @@ import {
   deleteCourse
 } from '../controllers/course.controller.js';
 
-import { verifyToken } from '../middleware/authMiddleware.js';
+import { verifyToken, attachUserIfPresent } from '../middleware/authMiddleware.js';
 import { isAdmin } from '../middleware/roleMiddleware.js';
 
 const router = express.Router();
 
-// Public
-router.get('/', getCourses);
+// Public, but an admin gets inactive courses included so the admin course
+// list can still manage plans that have been retired from pricing.
+router.get('/', attachUserIfPresent, getCourses);
 
 // User
 // Registered before '/:id' on purpose: Express matches in order, and '/:id'
