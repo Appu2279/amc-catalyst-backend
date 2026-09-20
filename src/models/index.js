@@ -22,6 +22,7 @@ import AttemptQuestion from './attemptQuestion.model.js';
 import Note from './note.model.js';
 import QuestionProgress from './questionProgress.model.js';
 import PaymentClaim from './paymentClaim.model.js';
+import PricingConfig from './pricingConfig.model.js';
 import ReferralConfig from './referralConfig.model.js';
 import ReferralCode from './referralCode.model.js';
 import Referral from './referral.model.js';
@@ -210,6 +211,7 @@ export {
   Note,
   QuestionProgress,
   PaymentClaim,
+  PricingConfig,
   ReferralConfig,
   ReferralCode,
   Referral,

@@ -16,6 +16,7 @@ import imageRoutes from './routes/image.routes.js';
 import meRoutes from './routes/me.routes.js';
 import paymentRoutes from './routes/payment.routes.js';
 import referralRoutes from './routes/referral.routes.js';
+import pricingConfigRoutes from './routes/pricingConfig.routes.js';
 
 const app = express();
 
@@ -55,5 +56,6 @@ app.use('/api/images',   imageRoutes);
 app.use('/api/me',       meRoutes);
 app.use('/api/payment-claims', paymentRoutes);
 app.use('/api/admin/referrals', referralRoutes);
+app.use('/api/pricing-config', pricingConfigRoutes);
 
 export default app;

@@ -44,6 +44,17 @@ const Note = sequelize.define(
       type: DataTypes.INTEGER,
     },
 
+    // S3 object key for the thumbnail shown on the student Notes card, e.g.
+    // 'amc-catalyst/notes/covers/12-1700000000000.jpg'. Nullable — most notes
+    // start without one and fall back to a generic icon in the UI. Never
+    // serialized directly (same reasoning as storage_public_id below); the API
+    // exposes only a has_cover boolean, and the bytes come back through
+    // GET /api/notes/:id/cover.
+    cover_image_key: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
+
     page_count: {
       type: DataTypes.INTEGER,
     },

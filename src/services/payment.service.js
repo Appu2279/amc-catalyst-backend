@@ -6,6 +6,7 @@ import { grantSubscription } from './course.service.js';
 import { qualifyReferralForPayment } from './referral.service.js';
 import { uploadPaymentScreenshot, isStorageConfigured } from '../config/storage.js';
 import { sendPaymentApprovedEmail } from './email.service.js';
+import { getPricingConfig, convertAudToInr } from './pricingConfig.service.js';
 
 /**
  * The manual payment workflow: a user says they paid by QR, an admin checks the
@@ -32,10 +33,15 @@ const generateReferenceCode = () => {
 };
 
 /**
- * What a course costs right now.
+ * What a course costs right now, in INR — the currency actually collected.
  *
  * The discounted price wins when set — that is the number on the pricing card,
- * so it is the number the buyer will transfer.
+ * so it is the number the buyer will transfer. AUD pricing (the fields
+ * courses are meant to use going forward) takes priority over the legacy INR
+ * fields when both are present, converted at PricingConfig's current rate —
+ * live, not a snapshot: this only runs at the moment a claim is opened, so an
+ * in-flight claim's amount_expected is unaffected by a rate change afterward,
+ * but the next claim opened for the same course reflects it immediately.
  */
 const priceOf = async (courseId) => {
   const pricing = await CoursePricing.findOne({
@@ -44,6 +50,12 @@ const priceOf = async (courseId) => {
   });
 
   if (!pricing) throw new AppError('This plan has no price set yet', 409);
+
+  const audAmount = pricing.discounted_price_aud ?? pricing.actual_price_aud;
+  if (audAmount !== null && audAmount !== undefined) {
+    const config = await getPricingConfig();
+    return convertAudToInr(audAmount, config.aud_to_inr_rate);
+  }
 
   const amount = pricing.discounted_price ?? pricing.actual_price;
   if (amount === null || amount === undefined) {

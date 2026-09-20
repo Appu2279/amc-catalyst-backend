@@ -15,6 +15,8 @@ const handle = (fn) => async (req, res) => {
 
 export const listNotes = handle(() => NoteService.listNotes());
 
+export const listPublicNoteCovers = handle(() => NoteService.listPublicCovers());
+
 // ── Admin ─────────────────────────────────────────────────────────────────────
 
 export const listNotesAdmin = handle(() => NoteService.listNotesAdmin());
@@ -53,6 +55,50 @@ export const updateNote = handle(async (req) =>
 );
 
 export const deleteNote = handle((req) => NoteService.deleteNote(req.params.id));
+
+export const uploadNoteCoverImage = handle(async (req) => {
+  if (!req.file) throw new AppError('Choose an image', 400);
+  return NoteService.setNoteCover(req.params.id, req.file.buffer, req.file.mimetype);
+});
+
+export const deleteNoteCoverImage = handle((req) => NoteService.removeNoteCover(req.params.id));
+
+/**
+ * GET /api/notes/:id/cover
+ *
+ * Streams a note's cover thumbnail the same way streamNoteFile streams the
+ * PDF — the object is private, so the bytes always come back through the
+ * backend rather than a direct S3 URL. Unlike the PDF there is no watermark
+ * (this is a marketing image, not the paid content) and no entitlement
+ * check — see getNoteCoverKey in note.service.js for why.
+ */
+export const streamNoteCover = async (req, res) => {
+  let key;
+  try {
+    key = await NoteService.getNoteCoverKey(req.params.id, req.user);
+    if (!isStorageConfigured) {
+      throw new AppError('File storage is not configured on this server', 503);
+    }
+  } catch (err) {
+    return res.status(err.status || 500).json({ message: err.message });
+  }
+
+  let object;
+  try {
+    object = await getObjectBuffer(key);
+  } catch (err) {
+    console.error(`Fetching note cover ${req.params.id} from storage failed:`, err.message);
+    return res.status(502).json({ message: 'Could not retrieve the cover image' });
+  }
+
+  res.set({
+    'Content-Type': object.contentType || 'image/jpeg',
+    'Cache-Control': 'private, max-age=86400',
+    'Content-Disposition': 'inline',
+    'X-Content-Type-Options': 'nosniff',
+  });
+  res.end(object.buffer);
+};
 
 /**
  * GET /api/notes/:id/file

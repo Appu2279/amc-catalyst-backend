@@ -4,9 +4,10 @@ import { Note } from '../models/index.js';
 import { assertSectionAccess } from './entitlement.service.js';
 import { SECTIONS } from '../constants/sections.js';
 import { AppError } from '../utils/AppError.js';
-import { uploadNoteBuffer, destroyObject } from '../config/storage.js';
+import { uploadNoteBuffer, uploadNoteCover, destroyObject } from '../config/storage.js';
 
 const FOLDER = 'amc-catalyst/notes';
+const COVER_FOLDER = 'amc-catalyst/notes/covers';
 
 /**
  * The only columns that ever reach a non-admin browser.
@@ -40,6 +41,20 @@ const ADMIN_ATTRIBUTES = [
 ];
 
 /**
+ * Shapes a Note instance for a response, adding a derived has_cover boolean
+ * in place of the raw cover_image_key.
+ *
+ * Like storage_public_id/file_url, the key itself never reaches the client —
+ * an admin or student who wants the pixels gets them from
+ * GET /api/notes/:id/cover, which fetches the object server-side. The
+ * boolean is all the UI needs to decide whether to render a thumbnail.
+ */
+const shapeNote = (note, attributes) => ({
+  ...Object.fromEntries(attributes.map((key) => [key, note[key]])),
+  has_cover: Boolean(note.cover_image_key),
+});
+
+/**
  * Shapes a Note instance for an admin response.
  *
  * Create and update return the model instance, which carries storage_public_id
@@ -47,8 +62,7 @@ const ADMIN_ATTRIBUTES = [
  * they are absent from the attribute lists above, and toJSON() would happily
  * include them.
  */
-export const toAdminView = (note) =>
-  Object.fromEntries(ADMIN_ATTRIBUTES.map((key) => [key, note[key]]));
+export const toAdminView = (note) => shapeNote(note, ADMIN_ATTRIBUTES);
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -105,24 +119,51 @@ const assertFileIsPdf = async (filePath) => {
 
 // ── Reads ─────────────────────────────────────────────────────────────────────
 
-export const listNotes = () =>
-  Note.findAll({
+/**
+ * id + title only, for the marketing homepage's cover slideshow — a visitor
+ * hasn't signed in yet, so this is deliberately the narrowest possible public
+ * view: no description, no page count, nothing beyond what it takes to show a
+ * cover image and caption it. Notes without a cover are left out; there is
+ * nothing to put in a slideshow slot for them.
+ */
+export const listPublicCovers = async () => {
+  const notes = await Note.findAll({
     where: { is_active: true },
-    attributes: PUBLIC_ATTRIBUTES,
+    attributes: ['id', 'title', 'cover_image_key'],
     order: [
       ['sort_order', 'ASC'],
       ['title', 'ASC'],
     ],
   });
+  return notes
+    .filter((note) => note.cover_image_key)
+    .map((note) => ({ id: note.id, title: note.title }));
+};
 
-export const listNotesAdmin = () =>
-  Note.findAll({
-    attributes: ADMIN_ATTRIBUTES,
+export const listNotes = async () => {
+  const notes = await Note.findAll({
+    where: { is_active: true },
+    // cover_image_key is fetched here so shapeNote can derive has_cover, but
+    // it is never in PUBLIC_ATTRIBUTES so it never reaches the response.
+    attributes: [...PUBLIC_ATTRIBUTES, 'cover_image_key'],
     order: [
       ['sort_order', 'ASC'],
       ['title', 'ASC'],
     ],
   });
+  return notes.map((note) => shapeNote(note, PUBLIC_ATTRIBUTES));
+};
+
+export const listNotesAdmin = async () => {
+  const notes = await Note.findAll({
+    attributes: [...ADMIN_ATTRIBUTES, 'cover_image_key'],
+    order: [
+      ['sort_order', 'ASC'],
+      ['title', 'ASC'],
+    ],
+  });
+  return notes.map((note) => shapeNote(note, ADMIN_ATTRIBUTES));
+};
 
 /**
  * The single place note access is decided.
@@ -148,6 +189,21 @@ export const getNoteForViewing = async (id, user) => {
   if (!note) throw new AppError('Note not found', 404);
   await assertCanAccess(note, user);
   return note;
+};
+
+/**
+ * Deliberately does not call assertCanAccess(): the cover is a marketing
+ * thumbnail, not the paid content, and has to render on a locked note too —
+ * that is what lets a browsing student judge it before unlocking. The only
+ * gate is the same one listNotes applies (hidden notes stay hidden from
+ * non-admins).
+ */
+export const getNoteCoverKey = async (id, user) => {
+  const note = await Note.findByPk(id);
+  if (!note) throw new AppError('Note not found', 404);
+  if (!note.is_active && user?.role !== 'admin') throw new AppError('Note not found', 404);
+  if (!note.cover_image_key) throw new AppError('This note has no cover image', 404);
+  return note.cover_image_key;
 };
 
 // ── Writes ────────────────────────────────────────────────────────────────────
@@ -239,6 +295,41 @@ export const updateNote = async (id, { title, description, sort_order, is_active
   return note;
 };
 
+/**
+ * Uploads a new cover image for an existing note and swaps it in.
+ *
+ * Storage first, then the row, same ordering as deleteNote: if the upload
+ * fails the note keeps whatever cover it had. The old object (if replacing
+ * one) is cleaned up best-effort after the row points at the new key, so a
+ * failure to delete it leaves an orphan in S3 rather than a note pointing at
+ * nothing.
+ */
+export const setNoteCover = async (id, buffer, contentType) => {
+  const note = await Note.findByPk(id);
+  if (!note) throw new AppError('Note not found', 404);
+
+  const ext = contentType.split('/')[1]?.replace('jpeg', 'jpg') || 'jpg';
+  const key = `${COVER_FOLDER}/${id}-${Date.now()}.${ext}`;
+  await uploadNoteCover(buffer, key, contentType);
+
+  const previousKey = note.cover_image_key;
+  await note.update({ cover_image_key: key });
+  if (previousKey) await destroyObject(previousKey).catch(() => {});
+
+  return toAdminView(note);
+};
+
+export const removeNoteCover = async (id) => {
+  const note = await Note.findByPk(id);
+  if (!note) throw new AppError('Note not found', 404);
+  if (!note.cover_image_key) return toAdminView(note);
+
+  await destroyObject(note.cover_image_key);
+  await note.update({ cover_image_key: null });
+
+  return toAdminView(note);
+};
+
 export const deleteNote = async (id) => {
   const note = await Note.findByPk(id);
   if (!note) throw new AppError('Note not found', 404);
@@ -247,6 +338,7 @@ export const deleteNote = async (id) => {
   // visible and retryable. Dropping the row first would strand a paid PDF in
   // S3 with nothing left pointing at it.
   await destroyObject(note.storage_public_id);
+  if (note.cover_image_key) await destroyObject(note.cover_image_key).catch(() => {});
   await note.destroy();
 
   return { message: 'Note deleted' };

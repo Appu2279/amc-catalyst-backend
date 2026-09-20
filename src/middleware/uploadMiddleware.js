@@ -141,3 +141,35 @@ export const uploadQuestionImage = (req, res, next) =>
 
     return res.status(400).json({ message: err.message });
   });
+
+
+/**
+ * A note's cover image — the thumbnail shown on the student Notes card.
+ *
+ * Memory, not disk — same reasoning as the avatar: one image on its way to
+ * S3, no reason to leave a copy on the server. Kept small because it is only
+ * ever displayed as a card thumbnail, never full-size.
+ */
+const NOTE_COVER_MAX_BYTES = 5 * 1024 * 1024;
+
+const noteCoverUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: NOTE_COVER_MAX_BYTES, files: 1 },
+  fileFilter: (req, file, cb) => {
+    if (/^image\/(jpe?g|png|webp|gif)$/i.test(file.mimetype)) return cb(null, true);
+    cb(new Error('Cover image must be a JPEG, PNG, WebP or GIF image'));
+  },
+});
+
+export const uploadNoteCover = (req, res, next) =>
+  noteCoverUpload.single('cover')(req, res, (err) => {
+    if (!err) return next();
+
+    if (err.code === 'LIMIT_FILE_SIZE') {
+      return res
+        .status(413)
+        .json({ message: `Cover image must be smaller than ${NOTE_COVER_MAX_BYTES / 1024 / 1024}MB` });
+    }
+
+    return res.status(400).json({ message: err.message });
+  });
