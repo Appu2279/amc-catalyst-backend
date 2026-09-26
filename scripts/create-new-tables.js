@@ -25,6 +25,7 @@ import {
   Subscription,
   Question,
   MockTest,
+  Subject,
 } from '../src/models/index.js';
 
 const MODELS = [
@@ -56,6 +57,11 @@ const COLUMNS = [
   ['questions', 'is_free', Question],
   ['mock_tests', 'is_free', MockTest],
   ['import_batches', 'is_free', ImportBatch],
+
+  // AMC blueprint domain for weighted mocks. Nullable: an unassigned subject is
+  // simply left out of weighted mocks. Fill existing rows with
+  // `npm run db:set-exam-domains`. Undo: ALTER TABLE subjects DROP COLUMN exam_domain;
+  ['subjects', 'exam_domain', Subject],
 ];
 
 const run = async () => {

@@ -1,5 +1,6 @@
 import { Subject, Topic } from '../models/index.js';
 import { AppError } from '../utils/AppError.js';
+import { EXAM_DOMAINS, isExamDomainKey } from '../constants/examDomains.js';
 
 const toSlug = (name) => name.toLowerCase().trim().replace(/\s+/g, '-');
 
@@ -19,13 +20,24 @@ export const getSubject = async (id) => {
   return subject;
 };
 
-export const createSubject = ({ name, description }) =>
-  Subject.create({ name, slug: toSlug(name), description });
+// `undefined` means "not being changed"; null clears the domain.
+const assertExamDomain = (examDomain) => {
+  if (examDomain === undefined || examDomain === null) return;
+  if (!isExamDomainKey(examDomain)) throw new AppError(`Unknown exam domain: ${examDomain}`, 400);
+};
 
-export const updateSubject = async (id, { name, description, is_active }) => {
+export const listExamDomains = () => EXAM_DOMAINS;
+
+export const createSubject = ({ name, description, exam_domain }) => {
+  assertExamDomain(exam_domain);
+  return Subject.create({ name, slug: toSlug(name), description, exam_domain: exam_domain ?? null });
+};
+
+export const updateSubject = async (id, { name, description, is_active, exam_domain }) => {
+  assertExamDomain(exam_domain);
   const subject = await Subject.findByPk(id);
   if (!subject) throw new AppError('Subject not found', 404);
-  await subject.update({ name, slug: name ? toSlug(name) : subject.slug, description, is_active });
+  await subject.update({ name, slug: name ? toSlug(name) : subject.slug, description, is_active, exam_domain });
   return subject;
 };
 
