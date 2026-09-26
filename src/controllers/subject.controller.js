@@ -9,6 +9,7 @@ const handle = (fn) => async (req, res) => {
 };
 
 export const listSubjects   = handle(() => SubjectService.listSubjects());
+export const listExamDomains = handle(() => SubjectService.listExamDomains());
 export const getSubject     = handle((req) => SubjectService.getSubject(req.params.id));
 export const createSubject  = handle(async (req, res) => { res.status(201); return SubjectService.createSubject(req.body); });
 export const updateSubject  = handle((req) => SubjectService.updateSubject(req.params.id, req.body));

@@ -1,4 +1,5 @@
 import * as MockTestService from '../services/mockTest.service.js';
+import * as WeightedMockService from '../services/weightedMock.service.js';
 
 export const createMockTest = async (req, res) => {
   try {
@@ -77,5 +78,21 @@ export const getQuestionPool = async (req, res) => {
     res.json(await MockTestService.getQuestionPool());
   } catch (err) {
     res.status(500).json({ message: err.message });
+  }
+};
+
+export const getWeightedMockPreview = async (req, res) => {
+  try {
+    res.json(await WeightedMockService.getWeightedMockPreview(req.query.question_count));
+  } catch (err) {
+    res.status(err.status || 500).json({ message: err.message });
+  }
+};
+
+export const createWeightedMock = async (req, res) => {
+  try {
+    res.status(201).json(await WeightedMockService.createWeightedMock(req.body));
+  } catch (err) {
+    res.status(err.status || 500).json({ message: err.message });
   }
 };

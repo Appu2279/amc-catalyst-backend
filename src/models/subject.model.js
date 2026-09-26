@@ -3,6 +3,7 @@
 // =============================================
 import { DataTypes } from 'sequelize';
 import sequelize from '../config/db.js';
+import { EXAM_DOMAIN_KEYS } from '../constants/examDomains.js';
 
 const Subject = sequelize.define(
   'Subject',
@@ -32,6 +33,17 @@ const Subject = sequelize.define(
     is_active: {
       type: DataTypes.BOOLEAN,
       defaultValue: true,
+    },
+
+    /**
+     * Which AMC blueprint domain this subject counts towards in a weighted mock
+     * (see constants/examDomains.js). Null means unassigned: the subject's
+     * questions are left out of weighted mocks until an admin picks a domain.
+     */
+    exam_domain: {
+      type: DataTypes.STRING,
+      allowNull: true,
+      validate: { isIn: [EXAM_DOMAIN_KEYS] },
     },
   },
   {

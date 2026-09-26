@@ -12,6 +12,8 @@ import {
   addQuestions,
   removeQuestion,
   getQuestionPool,
+  getWeightedMockPreview,
+  createWeightedMock,
 } from '../controllers/mockTest.controller.js';
 
 const router = Router();
@@ -19,6 +21,9 @@ const router = Router();
 router.use(verifyToken, isAdmin);
 
 router.get('/question-pool', getQuestionPool); // must be before /:id
+// AMC-weighted fixed mocks, built from subjects' exam_domain.
+router.get('/weighted/preview', getWeightedMockPreview); // must be before /:id
+router.post('/weighted', createWeightedMock);
 router.post('/', createMockTest);
 router.get('/', listMockTests);
 router.get('/:id', getMockTest);

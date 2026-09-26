@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { verifyToken } from '../middleware/authMiddleware.js';
 import { isAdmin } from '../middleware/roleMiddleware.js';
 import {
-  listSubjects, getSubject, createSubject, updateSubject, deleteSubject,
+  listSubjects, listExamDomains, getSubject, createSubject, updateSubject, deleteSubject,
   listTopics, createTopic, updateTopic, deleteTopic,
 } from '../controllers/subject.controller.js';
 
@@ -10,6 +10,7 @@ const router = Router();
 
 // Public
 router.get('/', listSubjects);
+router.get('/exam-domains', listExamDomains); // must be before /:id
 router.get('/:id', getSubject);
 router.get('/:id/topics', listTopics);
 

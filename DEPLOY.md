@@ -183,6 +183,18 @@ prints `CANNOT BE SOLD` next to any plan it couldn't resolve sections for, and
 reconstruct (its course was deleted before this migration ran). Stop and look
 into it rather than continuing on to the next command if either does.
 
+**AMC-weighted mocks release** (adds `subjects.exam_domain`): after
+`db:create-new` has added the column, fill it for existing subjects:
+
+```bash
+docker compose -f docker-compose.prod.yml run --rm api npm run db:set-exam-domains
+```
+
+It only fills subjects that have no domain yet, so it never overwrites a choice
+made on the admin Subjects page, and it lists any subject it could not match —
+assign those on that page. Undo, if ever needed:
+`ALTER TABLE subjects DROP COLUMN exam_domain;`
+
 Once all three report clean, cut over:
 
 ```bash
