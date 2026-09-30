@@ -7,7 +7,8 @@ export const checkAnswer = async (req, res) => {
     const data = await QuestionService.checkAnswer(
       req.params.id,
       req.body.selected_option_id,
-      req.user
+      req.user,
+      req.body.practice_scope
     );
     res.json({ data });
   } catch (err) {
@@ -19,6 +20,33 @@ export const checkAnswer = async (req, res) => {
 export const getPracticeProgress = async (req, res) => {
   try {
     res.json({ data: await QuestionService.getPracticeProgress(req.user.id, req.query) });
+  } catch (err) {
+    res.status(err.status || 500).json({ message: err.message });
+  }
+};
+
+// GET /api/questions/subjects?source_type=qbank
+export const listQuestionSubjects = async (req, res) => {
+  try {
+    res.json({ data: await QuestionService.listQuestionSubjects(req.query, req.user) });
+  } catch (err) {
+    res.status(err.status || 500).json({ message: err.message });
+  }
+};
+
+// GET /api/questions/topics?source_type=qbank&subject_id=3
+export const listQuestionTopics = async (req, res) => {
+  try {
+    res.json({ data: await QuestionService.listQuestionTopics(req.query, req.user) });
+  } catch (err) {
+    res.status(err.status || 500).json({ message: err.message });
+  }
+};
+
+// GET /api/questions/ids?source_type=qbank&subject_id=3
+export const listQuestionIds = async (req, res) => {
+  try {
+    res.json({ data: await QuestionService.listQuestionIds(req.query, req.user) });
   } catch (err) {
     res.status(err.status || 500).json({ message: err.message });
   }

@@ -1,11 +1,27 @@
 import { Op } from 'sequelize';
-import { sequelize, Question, QuestionOption, Subject, Topic, QuestionProgress, ImportBatch } from '../models/index.js';
+import { sequelize, Question, QuestionOption, Subject, Topic, QuestionProgress, ImportBatch, BookmarkedQuestion } from '../models/index.js';
 import { AppError } from '../utils/AppError.js';
 import { assertSectionAccess, restrictToEntitled } from './entitlement.service.js';
 import { SECTIONS } from '../constants/sections.js';
+import { PRACTICE_SCOPES, isPracticeScope } from '../constants/practiceScopes.js';
+
+const assertOptionalId = (value, name) => {
+  if (value !== undefined && value !== '' && !/^\d+$/.test(String(value))) {
+    throw new AppError(`${name} must be a number`, 400);
+  }
+};
+
+/** Missing means 'default', so Recall and older clients need not send it. */
+const parsePracticeScope = (value) => {
+  if (value === undefined || value === '') return PRACTICE_SCOPES.DEFAULT;
+  if (!isPracticeScope(value)) throw new AppError(`Unknown practice_scope "${value}"`, 400);
+  return value;
+};
 
 const buildWhere = (query) => {
   const { subject_id, topic_id, difficulty, question_type, source_type, search, is_active, import_batch_id } = query;
+  assertOptionalId(subject_id, 'subject_id');
+  assertOptionalId(topic_id, 'topic_id');
   const where = {};
   if (import_batch_id) where.import_batch_id = import_batch_id;
   if (subject_id) where.subject_id = subject_id;
@@ -312,12 +328,41 @@ const assertQuestionAccess = async (question, user) => {
   await assertSectionAccess(SOURCE_TYPE_SECTIONS[question.source_type] ?? SECTIONS.QBANK, user);
 };
 
+const PRACTICE_SUBSETS = Object.freeze(['incorrect', 'bookmarked']);
+
+/**
+ * A where-fragment narrowing practice to the student's own questions:
+ * `only=incorrect` (last answered wrong in this practice scope) or
+ * `only=bookmarked`. Applied identically to the id list and the question pages
+ * so the pages stay aligned with the ids.
+ *
+ * Ids are looked up first rather than joined, for the same limit-subquery
+ * reason given on inVisibleBatch.
+ */
+const practiceSubsetScope = async (query, user) => {
+  if (!query.only) return {};
+  if (!PRACTICE_SUBSETS.includes(query.only)) {
+    throw new AppError(`only must be one of: ${PRACTICE_SUBSETS.join(', ')}`, 400);
+  }
+
+  const rows = query.only === 'incorrect'
+    ? await QuestionProgress.findAll({
+      where: { user_id: user.id, practice_scope: parsePracticeScope(query.practice_scope), is_correct: false },
+      attributes: ['question_id'],
+      raw: true,
+    })
+    : await BookmarkedQuestion.findAll({ where: { user_id: user.id }, attributes: ['question_id'], raw: true });
+
+  return { id: { [Op.in]: rows.map((r) => r.question_id) } };
+};
+
 export const listQuestions = async (query, user) => {
   const where = {
     ...buildWhere(query),
     is_active: true,
     ...(await inVisibleBatch()),
     ...(await entitledScope(query, user)),
+    ...(await practiceSubsetScope(query, user)),
   };
   const { limit, offset, page } = paginate(query);
   const { count, rows } = await Question.findAndCountAll({
@@ -326,6 +371,30 @@ export const listQuestions = async (query, user) => {
     order: [['id', 'ASC']], distinct: true,
   });
   return { data: rows, pagination: { total: count, page, limit, pages: Math.ceil(count / limit) } };
+};
+
+/**
+ * Every question id a student may practise for one filter, in practice order.
+ *
+ * A QBank subject can hold thousands of questions — too many to send with
+ * their options in one list. The client takes the ids up front to know the
+ * total and where to resume, then pages through the full questions with
+ * listQuestions, which uses the same filter and order.
+ */
+export const listQuestionIds = async (query, user) => {
+  const rows = await Question.findAll({
+    where: {
+      ...buildWhere(query),
+      is_active: true,
+      ...(await inVisibleBatch()),
+      ...(await entitledScope(query, user)),
+      ...(await practiceSubsetScope(query, user)),
+    },
+    attributes: ['id'],
+    order: [['id', 'ASC']],
+    raw: true,
+  });
+  return rows.map((r) => r.id);
 };
 
 export const getQuestion = async (id, user) => {
@@ -343,7 +412,8 @@ export const getQuestion = async (id, user) => {
 };
 
 // Called after the student picks an option — returns correct flag + full option details
-export const checkAnswer = async (questionId, selectedOptionId, user) => {
+export const checkAnswer = async (questionId, selectedOptionId, user, practiceScope) => {
+  const scope = parsePracticeScope(practiceScope);
   const q = await Question.findOne({
     where: { id: questionId, is_active: true, ...(await inVisibleBatch()) },
     include: [{ model: QuestionOption, as: 'options' }],
@@ -380,6 +450,7 @@ export const checkAnswer = async (questionId, selectedOptionId, user) => {
         questionId: q.id,
         selectedOptionId: selected.id,
         isCorrect: selected.is_correct,
+        practiceScope: scope,
       });
     } catch (err) {
       console.error(`Could not record practice progress for question ${q.id}:`, err.message);
@@ -411,9 +482,9 @@ export const checkAnswer = async (questionId, selectedOptionId, user) => {
  * Answering the same question again overwrites the previous row rather than
  * adding one, so "answered" stays a set — see the unique index on the model.
  */
-const recordAnswer = async ({ userId, questionId, selectedOptionId, isCorrect }) => {
+const recordAnswer = async ({ userId, questionId, selectedOptionId, isCorrect, practiceScope }) => {
   const [row, created] = await QuestionProgress.findOrCreate({
-    where: { user_id: userId, question_id: questionId },
+    where: { user_id: userId, question_id: questionId, practice_scope: practiceScope },
     defaults: {
       selected_option_id: selectedOptionId,
       is_correct: isCorrect,
@@ -443,9 +514,11 @@ const recordAnswer = async ({ userId, questionId, selectedOptionId, isCorrect })
  * is_correct is what lets the score survive a logout instead of restarting at
  * zero.
  */
-export const getPracticeProgress = async (userId, { source_type, import_batch_id } = {}) => {
+export const getPracticeProgress = async (userId, { source_type, import_batch_id, subject_id, topic_id, practice_scope } = {}) => {
+  assertOptionalId(subject_id, 'subject_id');
+  assertOptionalId(topic_id, 'topic_id');
   const rows = await QuestionProgress.findAll({
-    where: { user_id: userId },
+    where: { user_id: userId, practice_scope: parsePracticeScope(practice_scope) },
     attributes: ['question_id', 'is_correct'],
     include: [
       {
@@ -462,6 +535,9 @@ export const getPracticeProgress = async (userId, { source_type, import_batch_id
           // set the student is actually looking at rather than every recall
           // they have ever done.
           ...(import_batch_id ? { import_batch_id } : {}),
+          // QBank is practised one subject at a time rather than by upload.
+          ...(subject_id ? { subject_id } : {}),
+          ...(topic_id ? { topic_id } : {}),
           ...(await inVisibleBatch()),
         },
       },
@@ -489,13 +565,21 @@ export const getPracticeProgress = async (userId, { source_type, import_batch_id
  * into a raw subquery — it keeps a caller-supplied value out of hand-written
  * SQL, and the practice sets are small enough that it makes no difference.
  */
-export const resetPracticeProgress = async (userId, { source_type, import_batch_id } = {}) => {
+export const resetPracticeProgress = async (userId, { source_type, import_batch_id, subject_id, topic_id, practice_scope } = {}) => {
   if (!source_type) throw new AppError('source_type is required', 400);
+  assertOptionalId(subject_id, 'subject_id');
+  assertOptionalId(topic_id, 'topic_id');
+  const scope = parsePracticeScope(practice_scope);
 
   const questions = await Question.findAll({
     // Scoped to a batch when given, so starting over on July's recall does not
     // also wipe the student's progress through August.
-    where: { source_type, ...(import_batch_id ? { import_batch_id } : {}) },
+    where: {
+      source_type,
+      ...(import_batch_id ? { import_batch_id } : {}),
+      ...(subject_id ? { subject_id } : {}),
+      ...(topic_id ? { topic_id } : {}),
+    },
     attributes: ['id'],
   });
 
@@ -504,11 +588,154 @@ export const resetPracticeProgress = async (userId, { source_type, import_batch_
   const cleared = await QuestionProgress.destroy({
     where: {
       user_id: userId,
+      practice_scope: scope,
       question_id: { [Op.in]: questions.map((q) => q.id) },
     },
   });
 
   return { cleared };
+};
+
+// ── Question subjects (QBank) ────────────────────────────────────────────────
+
+/** Question counts grouped by one column (subject_id or topic_id), as a Map. */
+const countByColumn = async (where, column) => {
+  const rows = await Question.findAll({
+    attributes: [column, [sequelize.fn('COUNT', sequelize.col('id')), 'count']],
+    where,
+    group: [column],
+    raw: true,
+  });
+  return new Map(rows.map((r) => [r[column], Number(r.count)]));
+};
+
+/**
+ * This student's answered/correct counts over the questions matching `where`,
+ * grouped by one column as a Map — or, with no column, one { answered, correct }.
+ */
+const countProgress = async (userId, practiceScope, where, column = null) => {
+  const rows = await QuestionProgress.findAll({
+    attributes: [
+      [sequelize.fn('COUNT', sequelize.col('QuestionProgress.id')), 'answered'],
+      [sequelize.fn('COUNT', sequelize.literal('CASE WHEN "QuestionProgress"."is_correct" THEN 1 END')), 'correct'],
+    ],
+    where: { user_id: userId, practice_scope: practiceScope },
+    include: [{
+      model: Question, as: 'question', required: true, where,
+      attributes: column ? [column] : [],
+    }],
+    ...(column ? { group: [`question.${column}`] } : {}),
+    raw: true,
+    nest: true,
+  });
+  const toCounts = (r) => ({ answered: Number(r?.answered ?? 0), correct: Number(r?.correct ?? 0) });
+  return column
+    ? new Map(rows.map((r) => [r.question[column], toCounts(r)]))
+    : toCounts(rows[0]);
+};
+
+/** One card's worth of numbers for a subject or topic. */
+const toPracticeGroup = ({ id, name }, totals, available, progress) => ({
+  id,
+  name,
+  question_count: totals.get(id),
+  available_count: available.get(id) ?? 0,
+  answered_count: progress.get(id)?.answered ?? 0,
+  correct_count: progress.get(id)?.correct ?? 0,
+});
+
+const byQuestionCountThenName = (a, b) => b.question_count - a.question_count || a.name.localeCompare(b.name);
+
+const visibleQuestionsWhere = async (sourceType) => ({
+  ...buildWhere({ source_type: sourceType }),
+  is_active: true,
+  ...(await inVisibleBatch()),
+});
+
+/**
+ * The subjects a student can choose between for a practice mode — QBank is
+ * one bank practised subject by subject, whichever upload a question came in.
+ *
+ * question_count is everything in the subject, so a student without a plan can
+ * see how much there is to unlock; available_count is what they may open now
+ * (the samples, or everything once they have paid). Questions with no subject
+ * are left out — there is no subject to list them under; the admin assigns one.
+ *
+ * Per-subject progress and "All subjects" progress are separate practice
+ * scopes, so each card counts only the answers given from it.
+ */
+export const listQuestionSubjects = async (query, user) => {
+  const where = { ...(await visibleQuestionsWhere(query.source_type)), subject_id: { [Op.ne]: null } };
+
+  const [totals, available, subjects, progress, allSubjectsProgress] = await Promise.all([
+    countByColumn(where, 'subject_id'),
+    countByColumn({ ...where, ...(await entitledScope(query, user)) }, 'subject_id'),
+    Subject.findAll({ where: { is_active: true }, attributes: ['id', 'name'], raw: true }),
+    countProgress(user.id, PRACTICE_SCOPES.DEFAULT, where, 'subject_id'),
+    countProgress(user.id, PRACTICE_SCOPES.ALL_SUBJECTS, where),
+  ]);
+
+  const subjectList = subjects
+    .filter((subject) => totals.has(subject.id))
+    .map((subject) => toPracticeGroup(subject, totals, available, progress))
+    .sort(byQuestionCountThenName);
+
+  return {
+    subjects: subjectList,
+    all_subjects: {
+      question_count: subjectList.reduce((sum, s) => sum + s.question_count, 0),
+      available_count: subjectList.reduce((sum, s) => sum + s.available_count, 0),
+      answered_count: allSubjectsProgress.answered,
+      correct_count: allSubjectsProgress.correct,
+    },
+  };
+};
+
+/**
+ * The topics inside one subject, for narrowing practice to e.g. Cardiology.
+ *
+ * Topic practice shares the subject's progress scope — a topic is part of its
+ * subject, so an answer given under Cardiology also counts on Medicine.
+ * `subject` totals the whole subject, including questions not tagged with a
+ * topic yet, which are reachable only through it.
+ */
+export const listQuestionTopics = async (query, user) => {
+  if (!query.subject_id) throw new AppError('subject_id is required', 400);
+  assertOptionalId(query.subject_id, 'subject_id');
+
+  const subject = await Subject.findOne({
+    where: { id: query.subject_id, is_active: true },
+    attributes: ['id', 'name'],
+    raw: true,
+  });
+  if (!subject) throw new AppError('Subject not found', 404);
+
+  const where = { ...(await visibleQuestionsWhere(query.source_type)), subject_id: subject.id };
+  const entitledWhere = { ...where, ...(await entitledScope(query, user)) };
+
+  const [totals, available, topics, progress, subjectTotal, subjectAvailable, subjectProgress] = await Promise.all([
+    countByColumn(where, 'topic_id'),
+    countByColumn(entitledWhere, 'topic_id'),
+    Topic.findAll({ where: { subject_id: subject.id }, attributes: ['id', 'name'], raw: true }),
+    countProgress(user.id, PRACTICE_SCOPES.DEFAULT, where, 'topic_id'),
+    Question.count({ where }),
+    Question.count({ where: entitledWhere }),
+    countProgress(user.id, PRACTICE_SCOPES.DEFAULT, where),
+  ]);
+
+  return {
+    subject: {
+      ...subject,
+      question_count: subjectTotal,
+      available_count: subjectAvailable,
+      answered_count: subjectProgress.answered,
+      correct_count: subjectProgress.correct,
+    },
+    topics: topics
+      .filter((topic) => totals.has(topic.id))
+      .map((topic) => toPracticeGroup(topic, totals, available, progress))
+      .sort(byQuestionCountThenName),
+  };
 };
 
 // ── Question batches (recall months) ─────────────────────────────────────────
@@ -560,7 +787,7 @@ export const listQuestionBatches = async ({ source_type } = {}, user) => {
   if (userId) {
     const progressRows = await QuestionProgress.findAll({
       attributes: [[sequelize.fn('COUNT', sequelize.col('QuestionProgress.id')), 'answered']],
-      where: { user_id: userId },
+      where: { user_id: userId, practice_scope: PRACTICE_SCOPES.DEFAULT },
       include: [
         {
           model: Question,
