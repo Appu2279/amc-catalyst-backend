@@ -47,6 +47,15 @@ const QuestionProgress = sequelize.define(
       defaultValue: false,
     },
 
+    // Where the answer was given: 'default' (Recall, and QBank by subject) or
+    // 'all_subjects' (QBank as the whole bank). Kept apart so each keeps its own
+    // progress. See constants/practiceScopes.js.
+    practice_scope: {
+      type: DataTypes.STRING(20),
+      allowNull: false,
+      defaultValue: 'default',
+    },
+
     // Bumped every time the student answers this question again, so the most
     // recent attempt is what the UI reflects.
     answered_at: {
@@ -59,10 +68,10 @@ const QuestionProgress = sequelize.define(
     tableName: 'question_progress',
     underscored: true,
     indexes: [
-      // One row per student per question: answering again updates the row
-      // rather than appending, so "answered" stays a set and the counts cannot
-      // drift above the number of questions.
-      { unique: true, fields: ['user_id', 'question_id'] },
+      // One row per student per question per practice scope: answering again
+      // updates the row rather than appending, so "answered" stays a set and
+      // the counts cannot drift above the number of questions.
+      { unique: true, fields: ['user_id', 'question_id', 'practice_scope'] },
     ],
   }
 );

@@ -17,6 +17,7 @@
     "db:set-sections": "node scripts/set-course-sections.js",
     "referral:backfill": "node scripts/backfill-referral-codes.js",
     "db:set-exam-domains": "node scripts/set-exam-domains.js",
+    "db:migrate-practice-scope": "node scripts/migrate-practice-scope.js",
     "mocks:export": "node scripts/export-mock-tests.js",
     "mocks:import": "node scripts/import-mock-tests.js",
     "mocks:import:api": "node scripts/import-mock-tests-api.js"
