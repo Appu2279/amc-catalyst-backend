@@ -3,8 +3,9 @@ import { sequelize, MockTest, MockTestQuestion } from '../models/index.js';
 import { AppError } from '../utils/AppError.js';
 import { EXAM_DOMAINS } from '../constants/examDomains.js';
 
-// Agreed with the client: weighted mocks draw from recall questions only.
-const SOURCE_TYPES = ['recall'];
+// Originally recall-only (agreed with the client); QBank added 2026-09-30 so
+// imported eMedici questions can fill papers too.
+const SOURCE_TYPES = ['recall', 'qbank'];
 const MIN_QUESTIONS = 20;
 const MAX_QUESTIONS = 300;
 const MAX_DURATION_MINUTES = 600;

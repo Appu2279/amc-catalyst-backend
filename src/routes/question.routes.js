@@ -4,7 +4,7 @@ import { isAdmin } from '../middleware/roleMiddleware.js';
 import {
   adminListQuestions, adminGetQuestion, createQuestion, updateQuestion, deleteQuestion, toggleQuestion, toggleQuestionFree,
   listQuestions, getQuestion, checkAnswer, getPracticeProgress, resetPracticeProgress,
-  listQuestionBatches,
+  listQuestionBatches, listQuestionSubjects, listQuestionTopics, listQuestionIds,
 } from '../controllers/question.controller.js';
 
 const router = Router();
@@ -23,6 +23,9 @@ router.patch('/admin/:id/free', verifyToken, isAdmin, toggleQuestionFree);
 // is never served anonymously; responses omit is_correct and explanation.
 // Declared before '/:id' so that "progress" is never read as a question id.
 router.get('/batches', verifyToken, listQuestionBatches);
+router.get('/subjects', verifyToken, listQuestionSubjects);
+router.get('/topics', verifyToken, listQuestionTopics);
+router.get('/ids', verifyToken, listQuestionIds);
 router.get('/progress', verifyToken, getPracticeProgress);
 router.delete('/progress', verifyToken, resetPracticeProgress);
 

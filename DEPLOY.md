@@ -195,6 +195,24 @@ made on the admin Subjects page, and it lists any subject it could not match —
 assign those on that page. Undo, if ever needed:
 `ALTER TABLE subjects DROP COLUMN exam_domain;`
 
+**Subject-wise QBank release** (adds `question_progress.practice_scope`, so
+"All subjects" practice keeps its own progress apart from each subject's). Run
+it with the old container still serving — the new API reads this column on
+every practice query, Recall included, so it must exist before cut-over:
+
+```bash
+docker compose -f docker-compose.prod.yml run --rm api npm run db:migrate-practice-scope
+```
+
+It prints `added    question_progress.practice_scope`. Existing rows become
+`'default'`, so current Recall and QBank progress is unchanged. It also swaps
+the unique index from (user_id, question_id) to (user_id, question_id,
+practice_scope), and stops with an error if an old unique index is left behind —
+drop that by hand before continuing. SQL:
+`migrations/20260930120000_add_practice_scope_to_question_progress.sql`. Undo
+(deletes any "All subjects" answers first):
+`docker compose -f docker-compose.prod.yml run --rm api npm run db:migrate-practice-scope -- --down`
+
 Once all three report clean, cut over:
 
 ```bash
