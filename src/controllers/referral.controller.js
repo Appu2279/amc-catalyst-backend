@@ -12,6 +12,8 @@ const handle = (fn) => async (req, res) => {
 
 export const getMyReferral = handle((req) => ReferralService.getMyReferral(req.user));
 
+export const applyReferralCode = handle((req) => ReferralService.applyReferralCode(req.user, req.body.code));
+
 // ── Admin ─────────────────────────────────────────────────────────────────────
 
 export const getOverview = handle(() => ReferralService.getOverview());

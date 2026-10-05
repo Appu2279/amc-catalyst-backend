@@ -7,6 +7,7 @@ import {
   ReferralCode,
   Referral,
   ReferralReward,
+  PaymentClaim,
 } from '../models/index.js';
 import { AppError } from '../utils/AppError.js';
 import {
@@ -248,16 +249,70 @@ export const qualifyReferralForPayment = async (userId, paymentClaimId, { transa
 
 // ── User-facing ───────────────────────────────────────────────────────────────
 
-/** The signed-in user's code and the current offer, for the profile screen. */
+const hasApprovedPayment = (userId) =>
+  PaymentClaim.count({ where: { user_id: userId, status: 'approved' } }).then((count) => count > 0);
+
+/**
+ * The signed-in user's own code and the current offer (profile screen), plus
+ * the code they were referred with, if any, and whether they can still enter
+ * one (checkout).
+ */
 export const getMyReferral = async (user) => {
-  const [code, config] = await Promise.all([ensureUserCode(user), getConfig()]);
+  const [code, config, referral, hasPaid] = await Promise.all([
+    ensureUserCode(user),
+    getConfig(),
+    Referral.findOne({ where: { referred_user_id: user.id }, attributes: ['code_used'] }),
+    hasApprovedPayment(user.id),
+  ]);
   return {
     code: code.code,
     is_active: code.is_active,
     mode: config.mode,
     reward_amount: Number(config.reward_amount),
     currency: config.currency,
+    referred_with_code: referral?.code_used ?? null,
+    can_apply_code: config.mode !== REFERRAL_MODES.OFF && !referral && !hasPaid,
   };
+};
+
+/**
+ * Lets a signed-in user enter a referral code themselves (at checkout), for
+ * anyone who did not arrive through a referral link. Same attribution as a
+ * signup link: one code per user, never their own, and only before their first
+ * approved payment — that payment is what qualifies the referral.
+ */
+export const applyReferralCode = async (user, codeString) => {
+  const config = await getConfig();
+  if (config.mode === REFERRAL_MODES.OFF) {
+    throw new AppError('Referral codes are not being accepted right now', 400);
+  }
+
+  const code = await resolveActiveCode(codeString);
+  if (!code) throw new AppError('That referral code is not valid', 400);
+  if (code.owner_type === 'user' && code.owner_user_id === user.id) {
+    throw new AppError('You cannot use your own referral code', 400);
+  }
+
+  const existing = await Referral.findOne({ where: { referred_user_id: user.id } });
+  if (existing) {
+    throw new AppError(`You have already used the referral code ${existing.code_used}`, 409);
+  }
+  if (await hasApprovedPayment(user.id)) {
+    throw new AppError('A referral code can only be used on your first purchase', 409);
+  }
+
+  try {
+    await Referral.create({
+      referral_code_id: code.id,
+      referred_user_id: user.id,
+      code_used: code.code,
+      status: REFERRAL_STATUS.JOINED,
+    });
+  } catch (err) {
+    // referred_user_id is unique — a double submit already recorded it.
+    if (!(err instanceof UniqueConstraintError)) throw err;
+  }
+  return getMyReferral(user);
 };
 
 // ── Admin: overview ───────────────────────────────────────────────────────────
