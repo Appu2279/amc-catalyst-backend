@@ -58,6 +58,21 @@ const User = sequelize.define('User', {
     },
   },
 
+  // WhatsApp number in E.164 form (+61412345678), validated by
+  // utils/phone.js. Required at registration; null for accounts created before
+  // it was collected, which can add it from their profile.
+  phone: {
+    type: DataTypes.STRING(20),
+    allowNull: true,
+  },
+
+  // When the student plans to sit the AMC exam, set from their profile.
+  // Optional; null until they add it.
+  amcExamDate: {
+    type: DataTypes.DATEONLY,
+    allowNull: true,
+  },
+
   // Private S3 object key for the profile picture, e.g.
   // 'avatars/21-1788623746123'. Never handed to the browser as-is — the client
   // reads it back through GET /api/me/avatar, which streams the bytes with the
@@ -82,6 +97,29 @@ const User = sequelize.define('User', {
         }
       },
     },
+  },
+
+  // Set by an admin from the Users page. A ban is in force while banned_at is
+  // set and banned_until is either null (permanent) or still in the future —
+  // so a timed ban lifts itself without any scheduled job.
+  banned_at: {
+    type: DataTypes.DATE,
+    allowNull: true,
+  },
+  banned_until: {
+    type: DataTypes.DATE,
+    allowNull: true,
+  },
+  ban_reason: {
+    type: DataTypes.STRING(500),
+    allowNull: true,
+  },
+
+  // Soft delete. A removed account cannot sign in, but its payments, plans and
+  // exam results stay intact and it can be restored. The email stays taken.
+  deleted_at: {
+    type: DataTypes.DATE,
+    allowNull: true,
   },
 }, {
   timestamps: true,

@@ -27,6 +27,7 @@ import {
   MockTest,
   Subject,
   LiveExam,
+  User,
 } from '../src/models/index.js';
 
 const MODELS = [
@@ -65,6 +66,23 @@ const COLUMNS = [
   // simply left out of weighted mocks. Fill existing rows with
   // `npm run db:set-exam-domains`. Undo: ALTER TABLE subjects DROP COLUMN exam_domain;
   ['subjects', 'exam_domain', Subject],
+
+  // Admin user controls: ban (timed or permanent) and soft delete. All
+  // nullable, so every existing account stays active and visible.
+  // Undo: migrations/20261006120000_add_ban_and_soft_delete_to_users.sql (DOWN).
+  ['users', 'banned_at', User],
+  ['users', 'banned_until', User],
+  ['users', 'ban_reason', User],
+  ['users', 'deleted_at', User],
+
+  // WhatsApp number, collected at registration. Nullable: existing accounts
+  // have none until they add it from their profile.
+  // Undo: migrations/20261006130000_add_phone_to_users.sql (DOWN).
+  ['users', 'phone', User],
+
+  // Planned AMC exam date, set from the profile. Nullable.
+  // Undo: migrations/20261006140000_add_amc_exam_date_to_users.sql (DOWN).
+  ['users', 'amc_exam_date', User],
 ];
 
 const run = async () => {

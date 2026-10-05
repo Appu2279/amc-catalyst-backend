@@ -1,6 +1,7 @@
 import bcrypt from 'bcrypt';
 import { User } from '../models/index.js';
 import { AppError } from '../utils/AppError.js';
+import { normalisePhone } from '../utils/phone.js';
 import {
   uploadAvatar,
   getObjectBuffer,
@@ -43,6 +44,24 @@ export const getProfile = async (userId) => {
  * Changing the password requires the current one: the token alone is a stolen
  * laptop, and a password change is what locks the real owner back out.
  */
+const AMC_EXAM_YEARS_AHEAD = 5;
+
+/** A YYYY-MM-DD date within a sensible range, or null to clear it. */
+const parseAmcExamDate = (value) => {
+  if (value === null || value === '') return null;
+  const text = String(value);
+  const date = new Date(`${text}T00:00:00Z`);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(text) || Number.isNaN(date.getTime())) {
+    throw new AppError('Enter a valid AMC exam date', 400);
+  }
+  const year = date.getUTCFullYear();
+  const thisYear = new Date().getUTCFullYear();
+  if (year < thisYear - 1 || year > thisYear + AMC_EXAM_YEARS_AHEAD) {
+    throw new AppError(`AMC exam date must be between ${thisYear - 1} and ${thisYear + AMC_EXAM_YEARS_AHEAD}`, 400);
+  }
+  return text;
+};
+
 export const updateProfile = async (userId, payload = {}) => {
   const user = await User.findByPk(userId);
   if (!user) throw new AppError('Account not found', 404);
@@ -63,6 +82,14 @@ export const updateProfile = async (userId, payload = {}) => {
       if (taken) throw new AppError('An account with this email already exists', 409);
       updates.email = email;
     }
+  }
+
+  if (payload.phone !== undefined) {
+    updates.phone = normalisePhone(payload.phone);
+  }
+
+  if (payload.amcExamDate !== undefined) {
+    updates.amcExamDate = parseAmcExamDate(payload.amcExamDate);
   }
 
   if (payload.professionalRole !== undefined) {
