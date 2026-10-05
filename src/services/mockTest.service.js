@@ -1,5 +1,5 @@
 import { QueryTypes } from 'sequelize';
-import { sequelize, MockTest, MockTestQuestion, Question, QuestionOption } from '../models/index.js';
+import { sequelize, MockTest, MockTestQuestion, Question, QuestionOption, LiveExam, UserMockAttempt } from '../models/index.js';
 import { AppError } from '../utils/AppError.js';
 
 export const createMockTest = async (data) => {
@@ -24,8 +24,32 @@ export const createMockTest = async (data) => {
   });
 };
 
+// Live-exam papers are left out: they are managed (and opened) from the Live
+// Exams page, and a regular mock used for one stays here untouched because
+// the exam sits a copy of it.
 export const listMockTests = () =>
-  MockTest.findAll({ order: [['created_at', 'DESC']] });
+  MockTest.findAll({
+    include: [{ model: LiveExam, as: 'live_exam', attributes: [], required: false }],
+    where: { '$live_exam.id$': null },
+    order: [['created_at', 'DESC']],
+  });
+
+/**
+ * A live exam's paper is managed from the Live Exams page. It must never be
+ * published as a practice mock (that would show its answers to anyone), nor
+ * deleted, nor — once anyone has started it — have its questions changed.
+ */
+const assertEditablePaper = async (testId, action) => {
+  const liveExam = await LiveExam.findOne({ where: { mock_test_id: testId } });
+  if (!liveExam) return;
+  if (action === 'publish' || action === 'delete') {
+    throw new AppError(`This mock is the paper of the live exam "${liveExam.title}" — manage it from Live Exams`, 400);
+  }
+  const attempts = await UserMockAttempt.count({ where: { mock_test_id: testId } });
+  if (attempts > 0) {
+    throw new AppError(`Students have already sat the live exam "${liveExam.title}" — its questions can no longer change`, 400);
+  }
+};
 
 export const getMockTest = async (id) => {
   const test = await MockTest.findByPk(id);
@@ -49,6 +73,11 @@ export const updateMockTest = async (id, data) => {
   const { title, description, duration_minutes, total_marks,
     randomize_questions, randomize_options, configuration_json, starts_at, ends_at } = data;
 
+  // A live exam's deadlines are computed from this, so it is fixed once anyone has started.
+  if (duration_minutes !== undefined && Number(duration_minutes) !== test.duration_minutes) {
+    await assertEditablePaper(test.id, 'edit');
+  }
+
   let total_questions = test.total_questions;
   if (test.test_type === 'dynamic' && configuration_json?.subjects) {
     total_questions = configuration_json.subjects.reduce((sum, s) => sum + (s.count || 0), 0);
@@ -62,6 +91,7 @@ export const updateMockTest = async (id, data) => {
 export const deleteMockTest = async (id) => {
   const test = await MockTest.findByPk(id);
   if (!test) throw new AppError('Mock test not found', 404);
+  await assertEditablePaper(test.id, 'delete');
   await test.destroy();
   return { message: 'Deleted successfully' };
 };
@@ -69,6 +99,7 @@ export const deleteMockTest = async (id) => {
 export const togglePublish = async (id) => {
   const test = await MockTest.findByPk(id);
   if (!test) throw new AppError('Mock test not found', 404);
+  if (!test.is_published) await assertEditablePaper(test.id, 'publish');
   await test.update({ is_published: !test.is_published });
   return { is_published: test.is_published };
 };
@@ -86,6 +117,7 @@ export const addQuestions = async (testId, questions) => {
   if (!test) throw new AppError('Mock test not found', 404);
   if (test.test_type !== 'fixed') throw new AppError('Cannot add questions to a dynamic test', 400);
   if (!questions?.length) throw new AppError('questions array is required', 400);
+  await assertEditablePaper(test.id, 'edit');
 
   await MockTestQuestion.bulkCreate(
     questions.map((q) => ({ mock_test_id: testId, question_id: q.question_id, question_order: q.question_order })),
@@ -115,6 +147,7 @@ export const getQuestionPool = async () =>
   );
 
 export const removeQuestion = async (testId, questionId) => {
+  await assertEditablePaper(testId, 'edit');
   const deleted = await MockTestQuestion.destroy({ where: { mock_test_id: testId, question_id: questionId } });
   if (!deleted) throw new AppError('Question not found in this test', 404);
 

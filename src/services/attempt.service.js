@@ -1,5 +1,5 @@
 import { Op } from 'sequelize';
-import { sequelize, MockTest, MockTestQuestion, Question, QuestionOption, UserMockAttempt, AttemptQuestion, UserAnswer } from '../models/index.js';
+import { sequelize, MockTest, MockTestQuestion, Question, QuestionOption, UserMockAttempt, AttemptQuestion, UserAnswer, LiveExam } from '../models/index.js';
 import { AppError } from '../utils/AppError.js';
 import { assertSectionAccess } from './entitlement.service.js';
 import { SECTIONS } from '../constants/sections.js';
@@ -94,18 +94,29 @@ export const getAttempt = async (attemptId, userId) => {
   if (!attempt) throw new AppError('Attempt not found', 404);
 
   const result = attempt.toJSON();
+  const livePaper = await isLivePaper(attempt.mock_test_id);
 
-  if (attempt.status === 'in_progress') {
-    result.attempt_questions = result.attempt_questions.map((aq) => ({
-      ...aq,
-      question: {
-        ...aq.question,
-        options: aq.question?.options?.map(({ is_correct: _, explanation: __, ...opt }) => opt),
-      },
-    }));
+  if (attempt.status === 'in_progress' || livePaper) {
+    // The question-level explanation and answer images give the answer away
+    // just as surely as is_correct does.
+    result.attempt_questions = result.attempt_questions.map((aq) => {
+      const { explanation: _e, answer_images: _a, ...question } = aq.question ?? {};
+      return {
+        ...aq,
+        question: {
+          ...question,
+          options: aq.question?.options?.map(({ is_correct: _, explanation: __, ...opt }) => opt),
+        },
+      };
+    });
   }
 
-  result.answers = await UserAnswer.findAll({ where: { attempt_id: attempt.id } });
+  result.answers = await UserAnswer.findAll({
+    where: { attempt_id: attempt.id },
+    // A live exam's marking stays hidden until results are published, and
+    // then it is served by the live-exam result endpoint, not this one.
+    ...(livePaper ? { attributes: { exclude: ['is_correct'] } } : {}),
+  });
   return result;
 };
 
@@ -114,6 +125,8 @@ export const submitAnswer = async (attemptId, userId, { question_id, selected_op
     where: { id: attemptId, user_id: userId, status: 'in_progress' },
   });
   if (!attempt) throw new AppError('Active attempt not found', 404);
+  // Live exams save answers through their own endpoint, which enforces the deadline.
+  await assertNotLivePaper(attempt.mock_test_id);
 
   const inAttempt = await AttemptQuestion.findOne({ where: { attempt_id: attempt.id, question_id } });
   if (!inAttempt) throw new AppError('Question not part of this attempt', 400);
@@ -132,46 +145,61 @@ export const submitAttempt = async (attemptId, userId) => {
     where: { id: attemptId, user_id: userId, status: 'in_progress' },
   });
   if (!attempt) throw new AppError('Active attempt not found', 404);
+  await assertNotLivePaper(attempt.mock_test_id);
 
   const t = await sequelize.transaction();
   try {
-    const attemptQuestions = await AttemptQuestion.findAll({
-      where: { attempt_id: attempt.id },
-      include: [{ model: Question, as: 'question' }],
-    });
-
-    const userAnswers = await UserAnswer.findAll({ where: { attempt_id: attempt.id } });
-    const answerMap = new Map(userAnswers.map((a) => [a.question_id, a]));
-    const correctOptionMap = await buildCorrectOptionMap(attemptQuestions.map((aq) => aq.question_id));
-
-    let score = 0, total_correct = 0, total_wrong = 0, total_unanswered = 0;
-    const updates = [];
-
-    for (const aq of attemptQuestions) {
-      const answer = answerMap.get(aq.question.id);
-      if (!answer) { total_unanswered++; continue; }
-
-      const is_correct = answer.selected_option_id === correctOptionMap.get(aq.question.id);
-      if (is_correct) { score += aq.question.marks; total_correct++; }
-      else { score -= aq.question.negative_marks; total_wrong++; }
-
-      updates.push(answer.update({ is_correct }, { transaction: t }));
-    }
-
-    await Promise.all(updates);
-    const completed_at = new Date();
-    await attempt.update(
-      { status: 'completed', score, total_correct, total_wrong, total_unanswered,
-        completed_at, time_taken_seconds: Math.floor((completed_at - attempt.started_at) / 1000) },
-      { transaction: t }
-    );
-
+    const totals = await gradeAttempt(attempt, { transaction: t });
     await t.commit();
-    return { message: 'Test submitted', score, total_correct, total_wrong, total_unanswered };
+    return { message: 'Test submitted', ...totals };
   } catch (err) {
     await t.rollback();
     throw err;
   }
+};
+
+/**
+ * Marks every saved answer right or wrong and closes the attempt.
+ *
+ * Shared by practice mocks and live exams. `completedAt` lets a live exam
+ * close an attempt at its deadline rather than whenever the grading happens
+ * to run (a student who walked away mid-exam is finalised later).
+ */
+export const gradeAttempt = async (attempt, { transaction, completedAt = new Date() } = {}) => {
+  const attemptQuestions = await AttemptQuestion.findAll({
+    where: { attempt_id: attempt.id },
+    include: [{ model: Question, as: 'question' }],
+    transaction,
+  });
+
+  const userAnswers = await UserAnswer.findAll({ where: { attempt_id: attempt.id }, transaction });
+  const answerMap = new Map(userAnswers.map((a) => [a.question_id, a]));
+  const correctOptionMap = await buildCorrectOptionMap(attemptQuestions.map((aq) => aq.question_id));
+
+  let score = 0, total_correct = 0, total_wrong = 0, total_unanswered = 0;
+  const updates = [];
+
+  for (const aq of attemptQuestions) {
+    const answer = answerMap.get(aq.question.id);
+    // A cleared answer (selected_option_id null) counts as unanswered.
+    if (!answer || answer.selected_option_id == null) { total_unanswered++; continue; }
+
+    const is_correct = answer.selected_option_id === correctOptionMap.get(aq.question.id);
+    if (is_correct) { score += aq.question.marks; total_correct++; }
+    else { score -= aq.question.negative_marks; total_wrong++; }
+
+    updates.push(answer.update({ is_correct }, { transaction }));
+  }
+
+  await Promise.all(updates);
+  const time_taken_seconds = Math.max(0, Math.floor((completedAt - attempt.started_at) / 1000));
+  await attempt.update(
+    { status: 'completed', score, total_correct, total_wrong, total_unanswered,
+      completed_at: completedAt, time_taken_seconds },
+    { transaction }
+  );
+
+  return { score, total_correct, total_wrong, total_unanswered };
 };
 
 export const getResult = async (attemptId, userId) => {
@@ -184,6 +212,7 @@ export const getResult = async (attemptId, userId) => {
     }],
   });
   if (!attempt) throw new AppError('Completed attempt not found', 404);
+  await assertNotLivePaper(attempt.mock_test_id);
 
   const answers = await UserAnswer.findAll({
     where: { attempt_id: attempt.id },
@@ -200,6 +229,19 @@ export const getResult = async (attemptId, userId) => {
 };
 
 // ── Helpers ──────────────────────────────────────
+
+/** True when this mock is the paper of a live exam. */
+export const isLivePaper = async (mockTestId) =>
+  (await LiveExam.count({ where: { mock_test_id: mockTestId } })) > 0;
+
+// A live exam's paper is only reachable through /api/live-exams, which hides
+// the marking until results are published and enforces the exam deadline.
+const assertNotLivePaper = async (mockTestId) => {
+  if (await isLivePaper(mockTestId)) {
+    throw new AppError('This attempt belongs to a live exam', 403);
+  }
+};
+
 async function generateDynamicQuestions(config) {
   const { subjects, difficulty } = config;
   const allIds = [];
