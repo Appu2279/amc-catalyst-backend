@@ -27,6 +27,7 @@ import ReferralConfig from './referralConfig.model.js';
 import ReferralCode from './referralCode.model.js';
 import Referral from './referral.model.js';
 import ReferralReward from './referralReward.model.js';
+import LiveExam from './liveExam.model.js';
 
 // 🔗 Relationships
 
@@ -167,6 +168,10 @@ UserAnswer.belongsTo(UserMockAttempt, { foreignKey: 'attempt_id' });
 UserAnswer.belongsTo(Question, { foreignKey: 'question_id', as: 'question' });
 UserAnswer.belongsTo(QuestionOption, { foreignKey: 'selected_option_id', as: 'selected_option' });
 
+// LIVE EXAMS — the scheduled event around one (unpublished, fixed) mock paper.
+LiveExam.belongsTo(MockTest, { foreignKey: 'mock_test_id', as: 'mock_test', onDelete: 'RESTRICT' });
+MockTest.hasOne(LiveExam, { foreignKey: 'mock_test_id', as: 'live_exam', onDelete: 'RESTRICT' });
+
 // BOOKMARKS
 User.hasMany(BookmarkedQuestion, { foreignKey: 'user_id' });
 BookmarkedQuestion.belongsTo(User, { foreignKey: 'user_id' });
@@ -216,4 +221,5 @@ export {
   ReferralCode,
   Referral,
   ReferralReward,
+  LiveExam,
 };

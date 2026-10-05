@@ -26,12 +26,15 @@ import {
   Question,
   MockTest,
   Subject,
+  LiveExam,
 } from '../src/models/index.js';
 
 const MODELS = [
   ['notes', Note],
   ['question_progress', QuestionProgress],
   ['payment_claims', PaymentClaim],
+  // Live (scheduled, results-later) exams. Undo: DROP TABLE live_exams;
+  ['live_exams', LiveExam],
 ];
 
 /**

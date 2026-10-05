@@ -213,6 +213,12 @@ drop that by hand before continuing. SQL:
 (deletes any "All subjects" answers first):
 `docker compose -f docker-compose.prod.yml run --rm api npm run db:migrate-practice-scope -- --down`
 
+**Live exam release** (adds the `live_exams` table — scheduled one-attempt
+exams with results published later). New table only; no existing column
+changes. `db:create-new` creates it (prints `created  live_exams`), so run it
+with the old container still serving, like the others. Undo:
+`DROP TABLE live_exams;` (the exam papers stay behind as unpublished mocks).
+
 Once all three report clean, cut over:
 
 ```bash

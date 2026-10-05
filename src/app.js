@@ -17,6 +17,8 @@ import meRoutes from './routes/me.routes.js';
 import paymentRoutes from './routes/payment.routes.js';
 import referralRoutes from './routes/referral.routes.js';
 import pricingConfigRoutes from './routes/pricingConfig.routes.js';
+import liveExamRoutes from './routes/liveExam.routes.js';
+import adminLiveExamRoutes from './routes/adminLiveExam.routes.js';
 
 const app = express();
 
@@ -57,5 +59,7 @@ app.use('/api/me',       meRoutes);
 app.use('/api/payment-claims', paymentRoutes);
 app.use('/api/admin/referrals', referralRoutes);
 app.use('/api/pricing-config', pricingConfigRoutes);
+app.use('/api/live-exams', liveExamRoutes);
+app.use('/api/admin/live-exams', adminLiveExamRoutes);
 
 export default app;
