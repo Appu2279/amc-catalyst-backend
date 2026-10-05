@@ -219,6 +219,25 @@ changes. `db:create-new` creates it (prints `created  live_exams`), so run it
 with the old container still serving, like the others. Undo:
 `DROP TABLE live_exams;` (the exam papers stay behind as unpublished mocks).
 
+**Admin user controls release** (adds `users.banned_at`, `users.banned_until`,
+`users.ban_reason`, `users.deleted_at` — ban and soft delete from the admin
+Users page). All four are nullable, so every existing account stays active.
+**Must run before cut-over:** the new code reads these columns on every
+signed-in request, so if they are missing every request fails. `db:create-new`
+adds them (prints `added    users.banned_at` and so on). Undo: the DOWN section
+of `migrations/20261006120000_add_ban_and_soft_delete_to_users.sql`.
+
+**WhatsApp number release** (adds `users.phone`, required at registration).
+Nullable, so existing accounts are unaffected; they can add it from Profile.
+Like the columns above, it must exist before cut-over — `db:create-new` adds
+it (prints `added    users.phone`). Undo: the DOWN section of
+`migrations/20261006130000_add_phone_to_users.sql`.
+
+**AMC exam date release** (adds `users.amc_exam_date`, set from the profile).
+Nullable; `db:create-new` adds it (prints `added    users.amc_exam_date`) and it
+must exist before cut-over. Undo: the DOWN section of
+`migrations/20261006140000_add_amc_exam_date_to_users.sql`.
+
 Once all three report clean, cut over:
 
 ```bash

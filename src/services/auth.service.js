@@ -2,6 +2,8 @@ import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import { sequelize, User } from '../models/index.js';
 import { AppError } from '../utils/AppError.js';
+import { isBanActive, banMessage } from '../utils/accountStatus.js';
+import { normalisePhone } from '../utils/phone.js';
 import { ensureUserCode, recordReferralOnSignup } from './referral.service.js';
 import {
   PROFESSIONAL_ROLE_VALUES,
@@ -14,6 +16,7 @@ export const register = async ({
   fullName,
   email,
   password,
+  phone,
   professionalRole,
   country,
   graduationYear,
@@ -27,6 +30,9 @@ export const register = async ({
   if (!password || password.length < 6) {
     throw new AppError('Password must be at least 6 characters', 400);
   }
+
+  if (!phone) throw new AppError('WhatsApp number is required', 400);
+  const cleanPhone = normalisePhone(phone);
 
   if (!PROFESSIONAL_ROLE_VALUES.includes(professionalRole)) {
     throw new AppError('Please select your current role', 400);
@@ -60,6 +66,7 @@ export const register = async ({
         fullName: name,
         email: cleanEmail,
         password: hashed,
+        phone: cleanPhone,
         professionalRole,
         country,
         graduationYear: year,
@@ -94,6 +101,11 @@ export const login = async (email, password) => {
 
   const isValid = await bcrypt.compare(password, user.password);
   if (!isValid) throw new AppError('Invalid email or password', 401);
+
+  // A removed account reads exactly like an unknown one. A banned user, having
+  // proved who they are, is told why they cannot get in and until when.
+  if (user.deleted_at) throw new AppError('Invalid email or password', 401);
+  if (isBanActive(user)) throw new AppError(banMessage(user), 403, { code: 'ACCOUNT_BANNED' });
 
   const token = jwt.sign(
     { id: user.id, role: user.role },

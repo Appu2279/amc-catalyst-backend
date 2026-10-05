@@ -19,6 +19,7 @@ import referralRoutes from './routes/referral.routes.js';
 import pricingConfigRoutes from './routes/pricingConfig.routes.js';
 import liveExamRoutes from './routes/liveExam.routes.js';
 import adminLiveExamRoutes from './routes/adminLiveExam.routes.js';
+import adminUserRoutes from './routes/adminUser.routes.js';
 
 const app = express();
 
@@ -61,5 +62,6 @@ app.use('/api/admin/referrals', referralRoutes);
 app.use('/api/pricing-config', pricingConfigRoutes);
 app.use('/api/live-exams', liveExamRoutes);
 app.use('/api/admin/live-exams', adminLiveExamRoutes);
+app.use('/api/admin/users', adminUserRoutes);
 
 export default app;

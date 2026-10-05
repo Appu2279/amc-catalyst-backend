@@ -5,6 +5,7 @@ import {
 } from '../models/index.js';
 import { NAME_DISPLAY_MODES } from '../models/liveExam.model.js';
 import { AppError } from '../utils/AppError.js';
+import { toCsv } from '../utils/csv.js';
 import { EXAM_DOMAINS } from '../constants/examDomains.js';
 import { gradeAttempt } from './attempt.service.js';
 import { createWeightedMock } from './weightedMock.service.js';
@@ -881,14 +882,6 @@ export const getResults = async (id) => {
   };
 };
 
-const csvCell = (value) => {
-  if (value == null) return '';
-  const text = String(value);
-  // Leading =, +, - or @ would run as a formula when the file is opened in Excel.
-  const safe = /^[=+\-@]/.test(text) ? `'${text}` : text;
-  return /[",\n\r]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe;
-};
-
 export const getResultsCsv = async (id) => {
   const { exam, candidates: all } = await getResults(id);
   const candidates = all.filter((c) => !c.is_admin);
@@ -908,8 +901,7 @@ export const getResultsCsv = async (id) => {
   ]);
   return {
     filename: `${exam.slug}-results.csv`,
-    // BOM so Excel reads the names as UTF-8.
-    body: '﻿' + [header, ...rows].map((r) => r.map(csvCell).join(',')).join('\r\n'),
+    body: toCsv(header, rows),
   };
 };
 

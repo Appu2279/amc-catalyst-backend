@@ -99,7 +99,19 @@ export const startClaim = async (userId, courseId) => {
   const existing = await PaymentClaim.findOne({
     where: { user_id: userId, course_id: courseId, status: 'pending' },
   });
-  if (existing) return existing;
+  if (existing) {
+    // Until the buyer says they have paid, the amount follows the current
+    // price — a claim opened before a price or exchange-rate change must not
+    // keep asking for the old amount. Once submitted it is what they actually
+    // sent, so it stays fixed.
+    if (!existing.submitted_at) {
+      const currentPrice = await priceOf(courseId);
+      if (Number(existing.amount_expected) !== Number(currentPrice)) {
+        await existing.update({ amount_expected: currentPrice });
+      }
+    }
+    return existing;
+  }
 
   // Already own it? Selling a second copy of the same active subscription is
   // never what anyone meant, and grantSubscription would refuse at approval
