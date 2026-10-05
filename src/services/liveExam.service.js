@@ -349,6 +349,8 @@ export const getMyAttempt = async (user, examId) => {
     where: { attempt_id: attempt.id },
     attributes: ['question_id', 'selected_option_id'],
   });
+  const lockedIds = new Set(answers.map((a) => a.question_id));
+  const nextIndex = attemptQuestions.findIndex((aq) => !lockedIds.has(aq.question_id));
 
   return {
     exam: examSummary(exam),
@@ -367,6 +369,9 @@ export const getMyAttempt = async (user, examId) => {
     answers: Object.fromEntries(
       answers.filter((a) => a.selected_option_id != null).map((a) => [a.question_id, a.selected_option_id])
     ),
+    // Questions before this index are locked. Equal to the question count once
+    // every question has been answered or skipped.
+    current_index: nextIndex === -1 ? attemptQuestions.length : nextIndex,
   };
 };
 
@@ -376,7 +381,14 @@ const loadRunningAttempt = async (exam, userId) => {
   return attempt;
 };
 
-/** Saves (or, with selected_option_id null, clears) one answer. Refused once time is up. */
+/**
+ * Locks in the answer to the next question (selected_option_id null = skipped).
+ *
+ * Client requirement for the live exam: questions are taken strictly in order
+ * and an answer cannot be changed once given. A question is locked as soon as
+ * it has a user_answers row, so only the first question without one can be
+ * saved. Refused once time is up.
+ */
 export const saveAnswer = async (user, examId, { question_id, selected_option_id }) => {
   const exam = await loadExam(examId);
   const attempt = await loadRunningAttempt(exam, user.id);
@@ -397,13 +409,35 @@ export const saveAnswer = async (user, examId, { question_id, selected_option_id
   }
 
   await sequelize.transaction(async (t) => {
-    // One row per question even if two saves race (double tap, retry).
-    await sequelize.query('SELECT pg_advisory_xact_lock(:attemptId, :questionId)', {
-      replacements: { attemptId: attempt.id, questionId }, transaction: t,
+    // Whole-attempt lock: "which question is next" must not change between
+    // reading it and writing the answer (double tap, retry, two tabs).
+    await sequelize.query('SELECT pg_advisory_xact_lock(:attemptId)', {
+      replacements: { attemptId: attempt.id }, transaction: t,
     });
+
     const existing = await UserAnswer.findOne({ where: { attempt_id: attempt.id, question_id: questionId }, transaction: t });
-    if (existing) await existing.update({ selected_option_id: optionId, answered_at: new Date() }, { transaction: t });
-    else await UserAnswer.create(
+    if (existing) {
+      // A retry of a save that already landed is fine; a different answer is not.
+      if (existing.selected_option_id === optionId) return;
+      throw new AppError('This answer has already been submitted and cannot be changed', 400);
+    }
+
+    const [attemptQuestions, answered] = await Promise.all([
+      AttemptQuestion.findAll({
+        where: { attempt_id: attempt.id },
+        attributes: ['question_id'],
+        order: [['question_order', 'ASC']],
+        transaction: t,
+      }),
+      UserAnswer.findAll({ where: { attempt_id: attempt.id }, attributes: ['question_id'], transaction: t }),
+    ]);
+    const answeredIds = new Set(answered.map((a) => a.question_id));
+    const nextQuestion = attemptQuestions.find((aq) => !answeredIds.has(aq.question_id));
+    if (nextQuestion?.question_id !== questionId) {
+      throw new AppError('Questions must be answered in order', 400);
+    }
+
+    await UserAnswer.create(
       { attempt_id: attempt.id, question_id: questionId, selected_option_id: optionId, answered_at: new Date() },
       { transaction: t }
     );
