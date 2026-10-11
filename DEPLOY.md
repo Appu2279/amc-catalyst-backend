@@ -238,6 +238,13 @@ Nullable; `db:create-new` adds it (prints `added    users.amc_exam_date`) and it
 must exist before cut-over. Undo: the DOWN section of
 `migrations/20261006140000_add_amc_exam_date_to_users.sql`.
 
+**Guideline Updates release** (adds `notes.collection`: `'notes'` or
+`'guidelines'`). NOT NULL with default `'notes'`, so every existing note stays
+in the Notes section. `db:create-new` adds it (prints `added    notes.collection`)
+and it must exist before cut-over — the new code selects it on every notes
+query. Undo: the DOWN section of
+`migrations/20261011120000_add_collection_to_notes.sql`.
+
 Once all three report clean, cut over:
 
 ```bash

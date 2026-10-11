@@ -1,12 +1,18 @@
 import fs from 'fs/promises';
 import path from 'path';
 import { Note } from '../models/index.js';
-import { assertSectionAccess } from './entitlement.service.js';
+import { assertSectionAccess, assertAnyPlan } from './entitlement.service.js';
 import { SECTIONS } from '../constants/sections.js';
+import { NOTE_COLLECTIONS, isNoteCollection } from '../constants/noteCollections.js';
 import { AppError } from '../utils/AppError.js';
 import { uploadNoteBuffer, uploadNoteCover, destroyObject } from '../config/storage.js';
 
-const FOLDER = 'amc-catalyst/notes';
+// One storage folder per collection, so a guideline PDF can never share a key
+// (and so a row) with a note that happens to have the same filename.
+const FOLDERS = {
+  [NOTE_COLLECTIONS.NOTES]: 'amc-catalyst/notes',
+  [NOTE_COLLECTIONS.GUIDELINES]: 'amc-catalyst/guidelines',
+};
 const COVER_FOLDER = 'amc-catalyst/notes/covers';
 
 /**
@@ -37,8 +43,13 @@ const ADMIN_ATTRIBUTES = [
   'file_size_bytes',
   'sort_order',
   'is_active',
+  'collection',
   'updatedAt',
 ];
+
+const assertCollection = (collection) => {
+  if (!isNoteCollection(collection)) throw new AppError('Unknown note collection', 400);
+};
 
 /**
  * Shapes a Note instance for a response, adding a derived has_cover boolean
@@ -128,7 +139,7 @@ const assertFileIsPdf = async (filePath) => {
  */
 export const listPublicCovers = async () => {
   const notes = await Note.findAll({
-    where: { is_active: true },
+    where: { is_active: true, collection: NOTE_COLLECTIONS.NOTES },
     attributes: ['id', 'title', 'cover_image_key'],
     order: [
       ['sort_order', 'ASC'],
@@ -140,9 +151,10 @@ export const listPublicCovers = async () => {
     .map((note) => ({ id: note.id, title: note.title }));
 };
 
-export const listNotes = async () => {
+export const listNotes = async (collection = NOTE_COLLECTIONS.NOTES) => {
+  assertCollection(collection);
   const notes = await Note.findAll({
-    where: { is_active: true },
+    where: { is_active: true, collection },
     // cover_image_key is fetched here so shapeNote can derive has_cover, but
     // it is never in PUBLIC_ATTRIBUTES so it never reaches the response.
     attributes: [...PUBLIC_ATTRIBUTES, 'cover_image_key'],
@@ -154,8 +166,10 @@ export const listNotes = async () => {
   return notes.map((note) => shapeNote(note, PUBLIC_ATTRIBUTES));
 };
 
-export const listNotesAdmin = async () => {
+export const listNotesAdmin = async (collection = NOTE_COLLECTIONS.NOTES) => {
+  assertCollection(collection);
   const notes = await Note.findAll({
+    where: { collection },
     attributes: [...ADMIN_ATTRIBUTES, 'cover_image_key'],
     order: [
       ['sort_order', 'ASC'],
@@ -180,6 +194,12 @@ const assertCanAccess = async (note, user) => {
 
   // Samples stay open to any signed-in user — that is what is_free is for.
   if (note.is_free) return;
+
+  // Guideline Updates come with every plan, not with the notes section.
+  if (note.collection === NOTE_COLLECTIONS.GUIDELINES) {
+    await assertAnyPlan(user, 'Guideline Updates');
+    return;
+  }
 
   await assertSectionAccess(SECTIONS.NOTES, user);
 };
@@ -243,7 +263,9 @@ export const publishNote = async ({
   description,
   sort_order,
   created_by,
+  collection = NOTE_COLLECTIONS.NOTES,
 }) => {
+  assertCollection(collection);
   await assertFileIsPdf(filePath);
 
   const base = path.basename(filename);
@@ -251,7 +273,7 @@ export const publishNote = async ({
   if (!slug) throw new AppError('Could not derive a filename for this note', 400);
 
   const buffer = await fs.readFile(filePath);
-  const key = `${FOLDER}/${slug}.pdf`;
+  const key = `${FOLDERS[collection]}/${slug}.pdf`;
   await uploadNoteBuffer(buffer, key);
 
   // Only fields the caller actually supplied are written. Re-uploading a file
@@ -268,6 +290,7 @@ export const publishNote = async ({
       file_size_bytes: buffer.length,
       page_count: bestEffortPageCount(buffer),
       is_active: true,
+      collection,
       ...(title?.trim() ? { title: title.trim() } : {}),
       ...(description === undefined ? {} : { description: description?.trim() || null }),
       ...(sort_order === undefined ? {} : { sort_order }),

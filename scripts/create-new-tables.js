@@ -83,6 +83,11 @@ const COLUMNS = [
   // Planned AMC exam date, set from the profile. Nullable.
   // Undo: migrations/20261006140000_add_amc_exam_date_to_users.sql (DOWN).
   ['users', 'amc_exam_date', User],
+
+  // Guideline Updates: which dashboard section a PDF belongs to. NOT NULL with
+  // default 'notes', so every existing note stays where it is.
+  // Undo: migrations/20261011120000_add_collection_to_notes.sql (DOWN).
+  ['notes', 'collection', Note],
 ];
 
 const run = async () => {
