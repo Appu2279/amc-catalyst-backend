@@ -107,9 +107,14 @@ const run = async () => {
       continue;
     }
 
-    await sequelize
-      .getQueryInterface()
-      .addColumn(table, column, model.getAttributes()[column]);
+    // Entries name the database column; a camelCase model attribute (e.g.
+    // amcExamDate → amc_exam_date under `underscored`) is matched by its field.
+    const attribute = Object.values(model.getAttributes()).find(
+      (definition) => (definition.field ?? definition.fieldName) === column
+    );
+    if (!attribute) throw new Error(`${model.name} has no attribute for column ${table}.${column}`);
+
+    await sequelize.getQueryInterface().addColumn(table, column, attribute);
     console.log(`added    ${table}.${column}`);
   }
 

@@ -166,7 +166,8 @@ const median = (values) => {
 const buildStats = (exam, completed) => {
   const percents = completed.map((r) => r.percent);
   const distribution = Array.from({ length: 10 }, (_, i) => ({ from: i * 10, to: (i + 1) * 10, count: 0 }));
-  for (const p of percents) distribution[Math.min(9, Math.floor(p / 10))].count++;
+  // Negative marking can push a score below zero; those land in the lowest band.
+  for (const p of percents) distribution[Math.min(9, Math.max(0, Math.floor(p / 10)))].count++;
   const passCount = exam.pass_percent == null ? null : completed.filter((r) => r.passed).length;
   const round1 = (n) => Math.round(n * 10) / 10;
   return {
