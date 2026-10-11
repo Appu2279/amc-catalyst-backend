@@ -13,13 +13,13 @@ const handle = (fn) => async (req, res) => {
   }
 };
 
-export const listNotes = handle(() => NoteService.listNotes());
+export const listNotes = handle((req) => NoteService.listNotes(req.query.collection));
 
 export const listPublicNoteCovers = handle(() => NoteService.listPublicCovers());
 
 // ── Admin ─────────────────────────────────────────────────────────────────────
 
-export const listNotesAdmin = handle(() => NoteService.listNotesAdmin());
+export const listNotesAdmin = handle((req) => NoteService.listNotesAdmin(req.query.collection));
 
 export const createNote = handle(async (req, res) => {
   if (!req.file) throw new AppError('Choose a PDF to upload', 400);
@@ -37,6 +37,8 @@ export const createNote = handle(async (req, res) => {
       description: req.body.description,
       sort_order,
       created_by: req.user.id,
+      // Multipart field; absent from the Notes upload form, so it defaults there.
+      collection: req.body.collection || undefined,
     });
 
     // 200 rather than 201 when an existing note was replaced, so the UI can tell

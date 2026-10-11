@@ -3,6 +3,7 @@
 // =============================================
 import { DataTypes } from 'sequelize';
 import sequelize from '../config/db.js';
+import { NOTE_COLLECTIONS, NOTE_COLLECTION_KEYS } from '../constants/noteCollections.js';
 
 const Note = sequelize.define(
   'Note',
@@ -85,6 +86,19 @@ const Note = sequelize.define(
     is_active: {
       type: DataTypes.BOOLEAN,
       defaultValue: true,
+    },
+
+    /**
+     * Which dashboard section lists this PDF — see constants/noteCollections.js.
+     * Defaults to 'notes', so every existing row stays in the Notes section.
+     * Set at upload and never changed: the stored object lives in that
+     * collection's folder.
+     */
+    collection: {
+      type: DataTypes.STRING(20),
+      allowNull: false,
+      defaultValue: NOTE_COLLECTIONS.NOTES,
+      validate: { isIn: [NOTE_COLLECTION_KEYS] },
     },
 
     created_by: {

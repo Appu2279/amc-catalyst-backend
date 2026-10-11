@@ -2,6 +2,7 @@ import { Op } from 'sequelize';
 import { Subscription, Note, Question, MockTest, ImportBatch } from '../models/index.js';
 import { AppError } from '../utils/AppError.js';
 import { SECTIONS, SECTION_KEYS, normaliseSections } from '../constants/sections.js';
+import { NOTE_COLLECTIONS } from '../constants/noteCollections.js';
 
 /**
  * The single place "may this user open this?" is answered.
@@ -82,6 +83,27 @@ export const assertSectionAccess = async (section, user) => {
 };
 
 /**
+ * Whether the user holds any live plan at all, whatever sections it grants.
+ * Gates content that comes with every plan (Guideline Updates) rather than
+ * with one section of it. Admins pass, as for sections.
+ */
+export const hasAnyPlan = async (user) => {
+  if (!user) return false;
+  if (user.role === 'admin') return true;
+  const live = await Subscription.count({
+    where: { user_id: user.id, status: 'active', end_date: { [Op.gt]: new Date() } },
+  });
+  return live > 0;
+};
+
+/** Throws unless the user holds any live plan — see hasAnyPlan. */
+export const assertAnyPlan = async (user, what = 'This') => {
+  if (!user) throw new AppError('Unauthorized', 401);
+  if (await hasAnyPlan(user)) return;
+  throw new AppError(`${what} is included with every plan — get one to unlock it`, 403);
+};
+
+/**
  * Restricts a set of requested sections to the ones the user actually holds.
  *
  * For listing endpoints that can legitimately return a mix — "show me my
@@ -141,6 +163,9 @@ export const getAccessSummary = async (user) => {
       SECTION_KEYS.map((key) => [key, isAdmin || granted.has(key)])
     ),
     admin_override: isAdmin,
+    // Any live plan at all — unlocks content that comes with every plan rather
+    // than with one section (Guideline Updates).
+    has_plan: isAdmin || subscriptions.length > 0,
     subscriptions: subscriptions.map((subscription) => ({
       id: subscription.id,
       plan_title: subscription.plan_title,
@@ -180,8 +205,9 @@ const sampleCounts = async () => {
     ? { [Op.or]: [{ is_free: true }, { import_batch_id: { [Op.in]: freeBatchIds } }] }
     : { is_free: true };
 
-  const [notes, qbank, recall, mocks] = await Promise.all([
-    Note.count({ where: { is_free: true, is_active: true } }),
+  const [notes, guidelines, qbank, recall, mocks] = await Promise.all([
+    Note.count({ where: { is_free: true, is_active: true, collection: NOTE_COLLECTIONS.NOTES } }),
+    Note.count({ where: { is_free: true, is_active: true, collection: NOTE_COLLECTIONS.GUIDELINES } }),
     Question.count({
       where: { is_active: true, source_type: ['qbank', 'previous_year'], ...sampleClause },
     }),
@@ -194,6 +220,9 @@ const sampleCounts = async () => {
     [SECTIONS.QBANK]: qbank,
     [SECTIONS.RECALL]: recall,
     [SECTIONS.MOCKS]: mocks,
+    // Not a section key: Guideline Updates are gated by "any plan", not by a
+    // section. Counted here so the page can tell free from locked the same way.
+    guidelines,
   };
 };
 
