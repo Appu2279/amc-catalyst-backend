@@ -185,8 +185,10 @@ export const gradeAttempt = async (attempt, { transaction, completedAt = new Dat
     if (!answer || answer.selected_option_id == null) { total_unanswered++; continue; }
 
     const is_correct = answer.selected_option_id === correctOptionMap.get(aq.question.id);
+    // No negative marking, as in the real AMC exam: a wrong answer scores 0.
+    // Imported questions carry negative_marks = 1, so it must not be read here.
     if (is_correct) { score += aq.question.marks; total_correct++; }
-    else { score -= aq.question.negative_marks; total_wrong++; }
+    else total_wrong++;
 
     updates.push(answer.update({ is_correct }, { transaction }));
   }
