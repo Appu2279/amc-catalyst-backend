@@ -1,7 +1,13 @@
 // =============================================
 // config/storage.js
 // =============================================
-import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
+import {
+  S3Client,
+  PutObjectCommand,
+  GetObjectCommand,
+  HeadObjectCommand,
+  DeleteObjectCommand,
+} from '@aws-sdk/client-s3';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -67,6 +73,23 @@ export const getObjectBuffer = async (key) => {
   const chunks = [];
   for await (const chunk of result.Body) chunks.push(chunk);
   return { buffer: Buffer.concat(chunks), contentType: result.ContentType };
+};
+
+// The instance role has no s3:ListBucket, and without it S3 reports a missing
+// key as AccessDenied rather than NoSuchKey — so both mean "not there".
+export const isMissingObjectError = (err) =>
+  err?.name === 'NoSuchKey' || err?.name === 'AccessDenied';
+
+export const objectExists = async (key) => {
+  try {
+    await s3.send(new HeadObjectCommand({ Bucket: bucket, Key: key }));
+    return true;
+  } catch (err) {
+    // HeadObject errors carry no body, so a missing key surfaces as NotFound
+    // (or Forbidden without s3:ListBucket) rather than the names GetObject uses.
+    if (['NotFound', 'Forbidden'].includes(err?.name) || isMissingObjectError(err)) return false;
+    throw err;
+  }
 };
 
 export const destroyObject = (key) => s3.send(new DeleteObjectCommand({ Bucket: bucket, Key: key }));

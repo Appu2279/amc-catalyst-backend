@@ -245,6 +245,23 @@ and it must exist before cut-over — the new code selects it on every notes
 query. Undo: the DOWN section of
 `migrations/20261011120000_add_collection_to_notes.sql`.
 
+**Faster notes release** (compressed note PDFs and resized covers for slow
+networks). No database change. The image now includes Python and PyMuPDF, so
+`build api` takes a minute longer. Originals in S3 are never modified; the
+smaller copies are stored beside them (`<note>.optimized.pdf`,
+`<cover>.thumb.jpg`). After cut-over, build copies for the existing notes (about
+10s per large note, one at a time; safe to re-run):
+
+```bash
+docker compose -f docker-compose.prod.yml exec api npm run notes:optimize
+```
+
+Then switch students over by adding `SERVE_OPTIMIZED_NOTES=true` to `.env` and
+running `docker compose -f docker-compose.prod.yml up -d api`. **To go back to
+the originals**, set it to `false` and run the same `up -d api` — about 20
+seconds, no rebuild. The copies can stay in S3 either way. New uploads from
+Admin → Notes are optimised automatically in the background.
+
 Once all three report clean, cut over:
 
 ```bash

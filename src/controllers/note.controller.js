@@ -2,7 +2,12 @@ import fs from 'fs/promises';
 import * as NoteService from '../services/note.service.js';
 import { watermarkPdf } from '../services/watermark.service.js';
 import { User } from '../models/index.js';
-import { getObjectBuffer, isStorageConfigured } from '../config/storage.js';
+import { isStorageConfigured } from '../config/storage.js';
+import {
+  getNoteFileObject,
+  getNoteCoverObject,
+  queueNoteOptimization,
+} from '../services/noteOptimize.service.js';
 import { AppError } from '../utils/AppError.js';
 
 const handle = (fn) => async (req, res) => {
@@ -44,6 +49,7 @@ export const createNote = handle(async (req, res) => {
     // 200 rather than 201 when an existing note was replaced, so the UI can tell
     // the admin their re-upload updated a note instead of adding a second one.
     res.status(created ? 201 : 200);
+    queueNoteOptimization(note.storage_public_id);
 
     return NoteService.toAdminView(note);
   } finally {
@@ -87,7 +93,7 @@ export const streamNoteCover = async (req, res) => {
 
   let object;
   try {
-    object = await getObjectBuffer(key);
+    object = await getNoteCoverObject(key);
   } catch (err) {
     console.error(`Fetching note cover ${req.params.id} from storage failed:`, err.message);
     return res.status(502).json({ message: 'Could not retrieve the cover image' });
@@ -141,7 +147,7 @@ export const streamNoteFile = async (req, res) => {
 
   let source;
   try {
-    source = await getObjectBuffer(note.storage_public_id);
+    source = await getNoteFileObject(note.storage_public_id);
   } catch (err) {
     console.error(`Fetching note ${note.id} from storage failed:`, err.message);
     return res.status(502).json({ message: 'Could not retrieve the note file' });
