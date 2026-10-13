@@ -12,6 +12,7 @@
     "db:seed": "npx sequelize-cli db:seed:all --seeders-path seeders",
     "db:seed:undo": "npx sequelize-cli db:seed:undo:all --seeders-path seeders",
     "notes:upload": "node scripts/upload-notes.js",
+    "notes:optimize": "node scripts/optimize-notes.js",
     "db:create-new": "node scripts/create-new-tables.js",
     "db:migrate-entitlements": "node scripts/migrate-subscription-entitlements.js",
     "db:set-sections": "node scripts/set-course-sections.js",
@@ -40,7 +41,8 @@
     "pg": "^8.20.0",
     "pg-hstore": "^2.3.4",
     "resend": "^6.26.0",
-    "sequelize": "^6.37.8"
+    "sequelize": "^6.37.8",
+    "sharp": "^0.34.5"
   },
   "devDependencies": {
     "nodemon": "^3.1.14",

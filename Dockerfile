@@ -18,6 +18,16 @@ FROM node:22-slim AS runtime
 ENV NODE_ENV=production
 WORKDIR /app
 
+# PyMuPDF builds the compressed note copies (scripts/optimize-pdf.py). Pinned to
+# the version the client's side-by-side quality check was done with. A venv,
+# because Debian's system Python refuses pip installs outright.
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends python3 python3-venv \
+  && rm -rf /var/lib/apt/lists/* \
+  && python3 -m venv /opt/pdf-tools \
+  && /opt/pdf-tools/bin/pip install --no-cache-dir pymupdf==1.28.0
+ENV PYTHON_BIN=/opt/pdf-tools/bin/python
+
 COPY --from=deps /app/node_modules ./node_modules
 COPY package.json ./
 COPY src ./src

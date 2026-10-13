@@ -11,8 +11,9 @@
  * Re-running on the same filename updates that note rather than creating a
  * duplicate; use the admin UI to set descriptions.
  *
- * Files are uploaded exactly as given, at full quality — S3 has no size
- * ceiling that matters here.
+ * Files are uploaded exactly as given, at full quality. The smaller copies
+ * students may be served are not built here: run `npm run notes:optimize`
+ * afterwards (the admin UI does that step automatically).
  */
 import path from 'path';
 import { isStorageConfigured } from '../src/config/storage.js';
@@ -65,6 +66,7 @@ const run = async () => {
   }
 
   console.log(`\n${created} created, ${updated} updated, ${failures.length} failed.`);
+  if (created + updated) console.log('Run `npm run notes:optimize` to build their smaller copies.');
 
   await sequelize.close();
   // Non-zero on any failure so this is safe to use from a script or CI step.

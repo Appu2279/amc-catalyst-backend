@@ -64,6 +64,10 @@ services:
       # instead of a broken page.
       AWS_REGION: ${AWS_REGION:-ap-south-1}
       S3_BUCKET: ${S3_BUCKET}
+      # 'true' serves students the compressed note PDFs and resized covers;
+      # anything else serves the untouched originals. Flip it in .env and run
+      # `docker compose -f docker-compose.prod.yml up -d api` — no rebuild.
+      SERVE_OPTIMIZED_NOTES: ${SERVE_OPTIMIZED_NOTES:-false}
       # Payment-approval and (future) verification emails. Not marked
       # required: without RESEND_API_KEY the API still runs — sendEmail in
       # config/email.js just logs and skips instead of sending.

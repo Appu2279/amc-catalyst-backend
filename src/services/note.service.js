@@ -6,6 +6,11 @@ import { SECTIONS } from '../constants/sections.js';
 import { NOTE_COLLECTIONS, isNoteCollection } from '../constants/noteCollections.js';
 import { AppError } from '../utils/AppError.js';
 import { uploadNoteBuffer, uploadNoteCover, destroyObject } from '../config/storage.js';
+import {
+  removeOptimizedNoteFile,
+  createCoverThumb,
+  removeCoverThumb,
+} from './noteOptimize.service.js';
 
 // One storage folder per collection, so a guideline PDF can never share a key
 // (and so a row) with a note that happens to have the same filename.
@@ -251,10 +256,9 @@ export const upsertNote = async (fields, createDefaults = {}) => {
  * endpoint and scripts/upload-notes.js so both agree on validation, naming and
  * the private-object settings.
  *
- * Uploaded exactly as received — no compression, no downsampling. S3 has no
- * practical size ceiling for a PDF of the kind this app handles, so unlike the
- * old Cloudinary path there is nothing here trading image clarity for a
- * storage limit.
+ * Stored exactly as received. The smaller copy students may be served is built
+ * separately afterwards (see noteOptimize.service.js), so the original is
+ * always there to fall back to.
  */
 export const publishNote = async ({
   filePath,
@@ -275,6 +279,9 @@ export const publishNote = async ({
   const buffer = await fs.readFile(filePath);
   const key = `${FOLDERS[collection]}/${slug}.pdf`;
   await uploadNoteBuffer(buffer, key);
+  // A re-upload replaces the original under the same key. Its old optimised
+  // copy must go now, or students would keep getting the previous version.
+  await removeOptimizedNoteFile(key);
 
   // Only fields the caller actually supplied are written. Re-uploading a file
   // to replace its PDF must not blank out a description or reset a title that
@@ -327,6 +334,16 @@ export const updateNote = async (id, { title, description, sort_order, is_active
  * failure to delete it leaves an orphan in S3 rather than a note pointing at
  * nothing.
  */
+// Best-effort: a failure leaves an orphan in S3, never a note pointing at nothing.
+const destroyCoverObjects = async (coverKey) => {
+  const results = await Promise.allSettled([destroyObject(coverKey), removeCoverThumb(coverKey)]);
+  results
+    .filter((result) => result.status === 'rejected')
+    .forEach((result) =>
+      console.error(`Removing cover ${coverKey} from storage failed:`, result.reason?.message)
+    );
+};
+
 export const setNoteCover = async (id, buffer, contentType) => {
   const note = await Note.findByPk(id);
   if (!note) throw new AppError('Note not found', 404);
@@ -334,10 +351,14 @@ export const setNoteCover = async (id, buffer, contentType) => {
   const ext = contentType.split('/')[1]?.replace('jpeg', 'jpg') || 'jpg';
   const key = `${COVER_FOLDER}/${id}-${Date.now()}.${ext}`;
   await uploadNoteCover(buffer, key, contentType);
+  // Not fatal: without a thumbnail the cover route serves the full image.
+  await createCoverThumb(key, buffer).catch((err) =>
+    console.error(`Creating a thumbnail for cover ${key} failed:`, err.message)
+  );
 
   const previousKey = note.cover_image_key;
   await note.update({ cover_image_key: key });
-  if (previousKey) await destroyObject(previousKey).catch(() => {});
+  if (previousKey) await destroyCoverObjects(previousKey);
 
   return toAdminView(note);
 };
@@ -348,6 +369,9 @@ export const removeNoteCover = async (id) => {
   if (!note.cover_image_key) return toAdminView(note);
 
   await destroyObject(note.cover_image_key);
+  await removeCoverThumb(note.cover_image_key).catch((err) =>
+    console.error(`Removing the thumbnail for ${note.cover_image_key} failed:`, err.message)
+  );
   await note.update({ cover_image_key: null });
 
   return toAdminView(note);
@@ -361,7 +385,10 @@ export const deleteNote = async (id) => {
   // visible and retryable. Dropping the row first would strand a paid PDF in
   // S3 with nothing left pointing at it.
   await destroyObject(note.storage_public_id);
-  if (note.cover_image_key) await destroyObject(note.cover_image_key).catch(() => {});
+  await removeOptimizedNoteFile(note.storage_public_id).catch((err) =>
+    console.error(`Removing the optimized copy of ${note.storage_public_id} failed:`, err.message)
+  );
+  if (note.cover_image_key) await destroyCoverObjects(note.cover_image_key);
   await note.destroy();
 
   return { message: 'Note deleted' };
