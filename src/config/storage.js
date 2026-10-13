@@ -75,19 +75,23 @@ export const getObjectBuffer = async (key) => {
   return { buffer: Buffer.concat(chunks), contentType: result.ContentType };
 };
 
-// The instance role has no s3:ListBucket, and without it S3 reports a missing
-// key as AccessDenied rather than NoSuchKey — so both mean "not there".
+// The instance role has no s3:ListBucket, and without it S3 answers a missing
+// key with 403 rather than 404. Matched on the status code, not the error name:
+// HEAD responses carry no body, so the SDK often names those errors
+// "UnknownError".
+const MISSING_OBJECT_STATUSES = [403, 404];
+
 export const isMissingObjectError = (err) =>
-  err?.name === 'NoSuchKey' || err?.name === 'AccessDenied';
+  err?.name === 'NoSuchKey' ||
+  err?.name === 'AccessDenied' ||
+  MISSING_OBJECT_STATUSES.includes(err?.$metadata?.httpStatusCode);
 
 export const objectExists = async (key) => {
   try {
     await s3.send(new HeadObjectCommand({ Bucket: bucket, Key: key }));
     return true;
   } catch (err) {
-    // HeadObject errors carry no body, so a missing key surfaces as NotFound
-    // (or Forbidden without s3:ListBucket) rather than the names GetObject uses.
-    if (['NotFound', 'Forbidden'].includes(err?.name) || isMissingObjectError(err)) return false;
+    if (isMissingObjectError(err)) return false;
     throw err;
   }
 };

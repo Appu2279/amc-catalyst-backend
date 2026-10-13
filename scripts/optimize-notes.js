@@ -65,7 +65,10 @@ const run = async () => {
       await createThumb(note, isForced);
     } catch (err) {
       failures.push(note.title);
-      console.error(`failed   ${note.title}: ${err.message}`);
+      // S3 errors can arrive with a message as bare as "UnknownError"; the
+      // status code is what actually says what went wrong.
+      const status = err.$metadata?.httpStatusCode;
+      console.error(`failed   ${note.title}: ${err.name}: ${err.message}${status ? ` (HTTP ${status})` : ''}`);
     }
   }
 
