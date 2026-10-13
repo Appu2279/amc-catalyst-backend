@@ -62,6 +62,21 @@ JSON
 sudo systemctl restart docker
 ```
 
+Add 2 GB of swap. Building the compressed copy of a large note PDF (see
+`npm run notes:optimize`) needs 500 MB or more on top of Postgres, the API and
+Caddy. Without swap, that spike on a 2 GB instance gets processes killed by the
+kernel's out-of-memory killer — this happened in production on the first
+`notes:optimize` run:
+
+```bash
+sudo fallocate -l 2G /swapfile
+sudo chmod 600 /swapfile
+sudo mkswap /swapfile
+sudo swapon /swapfile
+echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab   # survives reboots
+free -h   # the Swap: line should read 2.0Gi
+```
+
 ## 3. DNS
 
 Point `api.yourdomain.com` at the Elastic IP with an **A record**. Do this
@@ -249,8 +264,10 @@ query. Undo: the DOWN section of
 networks). No database change. The image now includes Python and PyMuPDF, so
 `build api` takes a minute longer. Originals in S3 are never modified; the
 smaller copies are stored beside them (`<note>.optimized.pdf`,
-`<cover>.thumb.jpg`). After cut-over, build copies for the existing notes (about
-10s per large note, one at a time; safe to re-run):
+`<cover>.thumb.jpg`). **Check `free -h` shows swap first** — an instance set up
+before this release has none, and the run below gets OOM-killed without it; see
+the swap step in section 2. After cut-over, build copies for the existing notes
+(about 10s per large note, one at a time; safe to re-run, skips finished notes):
 
 ```bash
 docker compose -f docker-compose.prod.yml exec api npm run notes:optimize
