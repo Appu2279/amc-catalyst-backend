@@ -17,6 +17,7 @@ import {
 const FOLDERS = {
   [NOTE_COLLECTIONS.NOTES]: 'amc-catalyst/notes',
   [NOTE_COLLECTIONS.GUIDELINES]: 'amc-catalyst/guidelines',
+  [NOTE_COLLECTIONS.PATHWAY]: 'amc-catalyst/pathway',
 };
 const COVER_FOLDER = 'amc-catalyst/notes/covers';
 
@@ -199,6 +200,9 @@ const assertCanAccess = async (note, user) => {
 
   // Samples stay open to any signed-in user — that is what is_free is for.
   if (note.is_free) return;
+
+  // The Pathway Guide is open to every signed-in user, PDFs included.
+  if (note.collection === NOTE_COLLECTIONS.PATHWAY) return;
 
   // Guideline Updates come with every plan, not with the notes section.
   if (note.collection === NOTE_COLLECTIONS.GUIDELINES) {
