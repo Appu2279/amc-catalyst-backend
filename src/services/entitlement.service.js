@@ -3,6 +3,7 @@ import { Subscription, Note, Question, MockTest, ImportBatch } from '../models/i
 import { AppError } from '../utils/AppError.js';
 import { SECTIONS, SECTION_KEYS, normaliseSections } from '../constants/sections.js';
 import { NOTE_COLLECTIONS } from '../constants/noteCollections.js';
+import { countFreeFlashcards } from '../content/flashcardDeck.js';
 
 /**
  * The single place "may this user open this?" is answered.
@@ -220,6 +221,7 @@ const sampleCounts = async () => {
     [SECTIONS.QBANK]: qbank,
     [SECTIONS.RECALL]: recall,
     [SECTIONS.MOCKS]: mocks,
+    [SECTIONS.FLASHCARDS]: countFreeFlashcards(),
     // Not a section key: Guideline Updates are gated by "any plan", not by a
     // section. Counted here so the page can tell free from locked the same way.
     guidelines,
@@ -232,4 +234,5 @@ const SECTION_LABELS = Object.freeze({
   [SECTIONS.QBANK]: 'the question bank',
   [SECTIONS.RECALL]: 'recalls',
   [SECTIONS.MOCKS]: 'mock exams',
+  [SECTIONS.FLASHCARDS]: 'flashcards',
 });
