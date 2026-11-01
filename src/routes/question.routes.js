@@ -3,7 +3,7 @@ import { verifyToken } from '../middleware/authMiddleware.js';
 import { isAdmin } from '../middleware/roleMiddleware.js';
 import {
   adminListQuestions, adminGetQuestion, createQuestion, updateQuestion, deleteQuestion, toggleQuestion, toggleQuestionFree,
-  listQuestions, getQuestion, checkAnswer, getPracticeProgress, resetPracticeProgress,
+  listQuestions, getQuestion, checkAnswer, getAnswerReview, getPracticeProgress, resetPracticeProgress,
   listQuestionBatches, listQuestionSubjects, listQuestionTopics, listQuestionIds,
 } from '../controllers/question.controller.js';
 
@@ -32,5 +32,6 @@ router.delete('/progress', verifyToken, resetPracticeProgress);
 router.get('/', verifyToken, listQuestions);
 router.get('/:id', verifyToken, getQuestion);
 router.post('/:id/check', verifyToken, checkAnswer);       // reveals answer after student picks
+router.get('/:id/review', verifyToken, getAnswerReview);   // re-shows an answered question's reveal
 
 export default router;

@@ -429,14 +429,6 @@ export const checkAnswer = async (questionId, selectedOptionId, user, practiceSc
   const selected = q.options.find(o => o.id === selectedOptionId);
   if (!selected) throw new AppError('Option not found', 404);
 
-  // Normalise answer_images to an array regardless of how it was stored
-  const rawImages = q.answer_images;
-  const answerImages = Array.isArray(rawImages)
-    ? rawImages
-    : typeof rawImages === 'string' && rawImages
-      ? [rawImages]
-      : [];
-
   // Recorded before the reveal is returned so the student's place is kept even
   // if they close the tab the instant they see the answer.
   //
@@ -457,8 +449,57 @@ export const checkAnswer = async (questionId, selectedOptionId, user, practiceSc
     }
   }
 
+  return toAnswerReveal(q, selected.is_correct);
+};
+
+/**
+ * The student's earlier answer to one question, with the full reveal, without
+ * answering again.
+ *
+ * This is what lets a student come back to a finished Recall or QBank set and
+ * learn from it — their pick, the correct answer and every explanation — rather
+ * than having to re-answer 250 questions to see them. Answering again would
+ * also overwrite the result they are trying to review.
+ *
+ * Only questions the student has already answered in this practice scope can
+ * be reviewed, so it never reveals an answer that has not been attempted.
+ */
+export const getAnswerReview = async (questionId, user, practiceScope) => {
+  const scope = parsePracticeScope(practiceScope);
+  const q = await Question.findOne({
+    where: { id: questionId, is_active: true, ...(await inVisibleBatch()) },
+    include: [{ model: QuestionOption, as: 'options' }],
+  });
+  if (!q) throw new AppError('Question not found', 404);
+
+  // Same gate as checkAnswer: a student whose plan has lapsed must not keep
+  // reading paid explanations through their old answers.
+  await assertQuestionAccess(q, user);
+
+  const progress = await QuestionProgress.findOne({
+    where: { user_id: user.id, question_id: q.id, practice_scope: scope },
+    attributes: ['selected_option_id', 'is_correct'],
+  });
+  if (!progress) throw new AppError('You have not answered this question yet', 404);
+
   return {
-    is_correct: selected.is_correct,
+    ...toAnswerReveal(q, progress.is_correct),
+    selected_option_id: progress.selected_option_id,
+  };
+};
+
+/** The answer, explanations and images shown once a question has been answered. */
+const toAnswerReveal = (q, isCorrect) => {
+  // Normalise answer_images to an array regardless of how it was stored
+  const rawImages = q.answer_images;
+  const answerImages = Array.isArray(rawImages)
+    ? rawImages
+    : typeof rawImages === 'string' && rawImages
+      ? [rawImages]
+      : [];
+
+  return {
+    is_correct: isCorrect,
     correct_option_id: q.options.find(o => o.is_correct)?.id ?? null,
     explanation: q.explanation ?? null,
     answer_images: answerImages,

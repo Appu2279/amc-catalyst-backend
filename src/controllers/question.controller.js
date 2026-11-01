@@ -16,6 +16,17 @@ export const checkAnswer = async (req, res) => {
   }
 };
 
+// GET /api/questions/:id/review?practice_scope=default — an answered question's
+// reveal, for reviewing a finished set without answering again.
+export const getAnswerReview = async (req, res) => {
+  try {
+    const data = await QuestionService.getAnswerReview(req.params.id, req.user, req.query.practice_scope);
+    res.json({ data });
+  } catch (err) {
+    res.status(err.status || 500).json({ message: err.message });
+  }
+};
+
 // GET /api/questions/progress?source_type=recall
 export const getPracticeProgress = async (req, res) => {
   try {
