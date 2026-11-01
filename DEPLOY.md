@@ -260,6 +260,23 @@ and it must exist before cut-over — the new code selects it on every notes
 query. Undo: the DOWN section of
 `migrations/20261011120000_add_collection_to_notes.sql`.
 
+**Flashcards release** (adds the `flashcards` section; the deck ships inside
+the API image). No schema change and nothing to run before cut-over. After the
+new API is live, tick **Flashcards** on the plans that should include it in
+Admin → Courses — that covers new purchases only, because each subscription
+keeps the sections its plan had when it was bought. To give it to students who
+already hold those plans, dry-run first and check the list:
+
+```bash
+docker compose -f docker-compose.prod.yml run --rm api npm run flashcards:grant-existing
+docker compose -f docker-compose.prod.yml run --rm api npm run flashcards:grant-existing -- --apply
+```
+
+Add `--course-ids=1,4` to limit it to some plans. `--apply` prints the ids it
+changed and the exact `--down --subscription-ids=… --apply` command that undoes
+it — save that line. Subscriptions with no section snapshot are listed as
+skipped and left alone.
+
 **Faster notes release** (compressed note PDFs and resized covers for slow
 networks). No database change. The image now includes Python and PyMuPDF, so
 `build api` takes a minute longer. Originals in S3 are never modified; the

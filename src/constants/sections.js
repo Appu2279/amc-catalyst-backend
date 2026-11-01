@@ -3,7 +3,7 @@
  *
  * These are entitlement keys, not marketing copy. Feature/Benefit rows are the
  * bullet points on a pricing card ("2500+ Structured MCQs", "Telegram
- * Community") and are written for humans; these four decide what the server
+ * Community") and are written for humans; these keys decide what the server
  * will actually serve. Keep them apart — a copy edit to a pricing card must
  * never change who can open a mock exam.
  *
@@ -15,6 +15,7 @@ export const SECTIONS = Object.freeze({
   QBANK: 'qbank',
   RECALL: 'recall',
   MOCKS: 'mocks',
+  FLASHCARDS: 'flashcards',
 });
 
 export const SECTION_KEYS = Object.freeze(Object.values(SECTIONS));
