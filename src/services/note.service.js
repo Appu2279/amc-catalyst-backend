@@ -37,6 +37,9 @@ const PUBLIC_ATTRIBUTES = [
   'page_count',
   'is_free',
   'createdAt',
+  // Lets the client version the cover URL (?v=updatedAt) so a replaced cover
+  // is not hidden behind the 24h browser cache on GET /api/notes/:id/cover.
+  'updatedAt',
 ];
 
 // Admins see the same columns plus the moderation ones, and the file size —
@@ -50,7 +53,6 @@ const ADMIN_ATTRIBUTES = [
   'sort_order',
   'is_active',
   'collection',
-  'updatedAt',
 ];
 
 const assertCollection = (collection) => {
