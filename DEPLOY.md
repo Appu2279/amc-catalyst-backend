@@ -277,6 +277,28 @@ changed and the exact `--down --subscription-ids=… --apply` command that undoe
 it — save that line. Subscriptions with no section snapshot are listed as
 skipped and left alone.
 
+**Online class groups release** (adds the `online_classes` section and
+`GET /api/me/class-groups`). No schema change. Before cut-over, add the two
+invite links to the server's `.env`:
+
+```bash
+ONLINE_CLASS_WHATSAPP_URL=<WhatsApp group invite link>
+ONLINE_CLASS_TELEGRAM_URL=<Telegram group invite link>
+```
+
+After the new API is live, tick **Online classes** on AMC Full Course in
+Admin → Courses (covers new purchases). To give it to students who already
+hold that plan, dry-run first and check the list, then apply. Pass the plan's
+course id so no other plan is touched:
+
+```bash
+docker compose -f docker-compose.prod.yml run --rm api npm run online-classes:grant-existing -- --course-ids=<id>
+docker compose -f docker-compose.prod.yml run --rm api npm run online-classes:grant-existing -- --course-ids=<id> --apply
+```
+
+`--apply` prints the exact undo command — save it. To change a link later,
+edit `.env` and run `docker compose -f docker-compose.prod.yml up -d api`.
+
 **Faster notes release** (compressed note PDFs and resized covers for slow
 networks). No database change. The image now includes Python and PyMuPDF, so
 `build api` takes a minute longer. Originals in S3 are never modified; the

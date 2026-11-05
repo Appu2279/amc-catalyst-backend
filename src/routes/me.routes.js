@@ -3,6 +3,7 @@ import { verifyToken } from '../middleware/authMiddleware.js';
 import { uploadAvatar } from '../middleware/uploadMiddleware.js';
 import {
   getMyAccess,
+  getMyClassGroups,
   getMyProfile,
   updateMyProfile,
   uploadMyAvatar,
@@ -18,6 +19,7 @@ const router = Router();
 router.use(verifyToken);
 
 router.get('/access', getMyAccess);
+router.get('/class-groups', getMyClassGroups);
 router.get('/referral', getMyReferral);
 router.post('/referral/apply', applyReferralCode);
 

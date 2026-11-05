@@ -235,4 +235,5 @@ const SECTION_LABELS = Object.freeze({
   [SECTIONS.RECALL]: 'recalls',
   [SECTIONS.MOCKS]: 'mock exams',
   [SECTIONS.FLASHCARDS]: 'flashcards',
+  [SECTIONS.ONLINE_CLASSES]: 'the online class groups',
 });
