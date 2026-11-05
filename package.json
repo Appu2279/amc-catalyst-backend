@@ -19,7 +19,8 @@
     "referral:backfill": "node scripts/backfill-referral-codes.js",
     "db:set-exam-domains": "node scripts/set-exam-domains.js",
     "db:migrate-practice-scope": "node scripts/migrate-practice-scope.js",
-    "flashcards:grant-existing": "node scripts/grant-flashcards-to-subscribers.js",
+    "flashcards:grant-existing": "node scripts/grant-section-to-subscribers.js --section=flashcards",
+    "online-classes:grant-existing": "node scripts/grant-section-to-subscribers.js --section=online_classes",
     "mocks:export": "node scripts/export-mock-tests.js",
     "mocks:import": "node scripts/import-mock-tests.js",
     "mocks:import:api": "node scripts/import-mock-tests-api.js"

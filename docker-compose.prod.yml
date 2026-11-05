@@ -74,6 +74,10 @@ services:
       RESEND_API_KEY: ${RESEND_API_KEY}
       EMAIL_FROM: ${EMAIL_FROM}
       FRONTEND_URL: ${FRONTEND_URL}
+      # Invite links shown to students whose plan includes online classes.
+      # Change them in .env and run `up -d api` — no rebuild.
+      ONLINE_CLASS_WHATSAPP_URL: ${ONLINE_CLASS_WHATSAPP_URL}
+      ONLINE_CLASS_TELEGRAM_URL: ${ONLINE_CLASS_TELEGRAM_URL}
     expose:
       - '3000'
     depends_on:

@@ -16,6 +16,9 @@ export const SECTIONS = Object.freeze({
   RECALL: 'recall',
   MOCKS: 'mocks',
   FLASHCARDS: 'flashcards',
+  // Only the plans with live online classes (AMC Full Course) tick this; it
+  // unlocks the class WhatsApp and Telegram groups.
+  ONLINE_CLASSES: 'online_classes',
 });
 
 export const SECTION_KEYS = Object.freeze(Object.values(SECTIONS));

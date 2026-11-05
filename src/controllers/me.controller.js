@@ -1,5 +1,6 @@
 import * as EntitlementService from '../services/entitlement.service.js';
 import * as MeService from '../services/me.service.js';
+import { SECTIONS } from '../constants/sections.js';
 
 /**
  * What the signed-in user may open, and the subscriptions behind it.
@@ -13,6 +14,24 @@ import * as MeService from '../services/me.service.js';
 export const getMyAccess = async (req, res) => {
   try {
     res.json(await EntitlementService.getAccessSummary(req.user));
+  } catch (err) {
+    res.status(err.status || 500).json({ message: err.message });
+  }
+};
+
+/**
+ * Invite links to the online class WhatsApp and Telegram groups.
+ *
+ * Served from the API (and kept in .env) rather than shipped in the frontend
+ * bundle, so only students whose plan includes online classes ever see them.
+ */
+export const getMyClassGroups = async (req, res) => {
+  try {
+    await EntitlementService.assertSectionAccess(SECTIONS.ONLINE_CLASSES, req.user);
+    res.json({
+      whatsapp_url: process.env.ONLINE_CLASS_WHATSAPP_URL?.trim() || null,
+      telegram_url: process.env.ONLINE_CLASS_TELEGRAM_URL?.trim() || null,
+    });
   } catch (err) {
     res.status(err.status || 500).json({ message: err.message });
   }
