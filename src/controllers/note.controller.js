@@ -18,7 +18,7 @@ const handle = (fn) => async (req, res) => {
   }
 };
 
-export const listNotes = handle((req) => NoteService.listNotes(req.query.collection));
+export const listNotes = handle((req) => NoteService.listNotes(req.query.collection, req.user));
 
 export const listPublicNoteCovers = handle(() => NoteService.listPublicCovers());
 
@@ -78,7 +78,7 @@ export const deleteNoteCoverImage = handle((req) => NoteService.removeNoteCover(
  * PDF — the object is private, so the bytes always come back through the
  * backend rather than a direct S3 URL. Unlike the PDF there is no watermark
  * (this is a marketing image, not the paid content) and no entitlement
- * check — see getNoteCoverKey in note.service.js for why.
+ * check (except class slides) — see getNoteCoverKey in note.service.js for why.
  */
 export const streamNoteCover = async (req, res) => {
   let key;

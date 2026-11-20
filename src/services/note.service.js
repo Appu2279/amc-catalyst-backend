@@ -160,8 +160,12 @@ export const listPublicCovers = async () => {
     .map((note) => ({ id: note.id, title: note.title }));
 };
 
-export const listNotes = async (collection = NOTE_COLLECTIONS.NOTES) => {
+export const listNotes = async (collection = NOTE_COLLECTIONS.NOTES, user) => {
   assertCollection(collection);
+  // Unlike the other collections, even the titles are for online-class students only.
+  if (collection === NOTE_COLLECTIONS.CLASS_SLIDES) {
+    await assertSectionAccess(SECTIONS.ONLINE_CLASSES, user);
+  }
   const notes = await Note.findAll({
     where: { is_active: true, collection },
     // cover_image_key is fetched here so shapeNote can derive has_cover, but
@@ -241,6 +245,10 @@ export const getNoteCoverKey = async (id, user) => {
   const note = await Note.findByPk(id);
   if (!note) throw new AppError('Note not found', 404);
   if (!note.is_active && user?.role !== 'admin') throw new AppError('Note not found', 404);
+  // Class slide covers can show the title, so they follow the slides' own gate.
+  if (note.collection === NOTE_COLLECTIONS.CLASS_SLIDES) {
+    await assertSectionAccess(SECTIONS.ONLINE_CLASSES, user);
+  }
   if (!note.cover_image_key) throw new AppError('This note has no cover image', 404);
   return note.cover_image_key;
 };
