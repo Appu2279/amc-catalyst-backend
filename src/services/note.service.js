@@ -18,6 +18,7 @@ const FOLDERS = {
   [NOTE_COLLECTIONS.NOTES]: 'amc-catalyst/notes',
   [NOTE_COLLECTIONS.GUIDELINES]: 'amc-catalyst/guidelines',
   [NOTE_COLLECTIONS.PATHWAY]: 'amc-catalyst/pathway',
+  [NOTE_COLLECTIONS.CLASS_SLIDES]: 'amc-catalyst/class-slides',
 };
 const COVER_FOLDER = 'amc-catalyst/notes/covers';
 
@@ -199,6 +200,13 @@ const assertCanAccess = async (note, user) => {
   if (!user) throw new AppError('Unauthorized', 401);
   if (user.role === 'admin') return; // admins preview inactive notes
   if (!note.is_active) throw new AppError('Note not found', 404);
+
+  // Checked before is_free: class slides are for online-class students only,
+  // so a stray free flag must not open them to everyone.
+  if (note.collection === NOTE_COLLECTIONS.CLASS_SLIDES) {
+    await assertSectionAccess(SECTIONS.ONLINE_CLASSES, user);
+    return;
+  }
 
   // Samples stay open to any signed-in user — that is what is_free is for.
   if (note.is_free) return;
